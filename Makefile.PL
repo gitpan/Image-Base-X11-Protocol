@@ -1,0 +1,55 @@
+#!/usr/bin/perl -w
+
+# Copyright 2010 Kevin Ryde
+
+# This file is part of Image-Base-X11-Protocol.
+#
+# Image-Base-X11-Protocol is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License as published
+# by the Free Software Foundation; either version 3, or (at your option) any
+# later version.
+#
+# Image-Base-X11-Protocol is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General
+# Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along
+# with Image-Base-X11-Protocol.  If not, see <http://www.gnu.org/licenses/>.
+
+use 5.004;
+use strict;
+use warnings;
+use ExtUtils::MakeMaker;
+use lib 'inc';
+use MyMakeMakerExtras;
+
+MyMakeMakerExtras::WriteMakefile
+  (NAME         => 'Image-Base-X11-Protocol',
+   ABSTRACT     => 'Draw into X windows and pixmaps in Image::Base style.',
+   VERSION_FROM => 'lib/Image/Base/X11/Protocol/Drawable.pm',
+   AUTHOR       => 'Kevin Ryde <user42@zip.com.au>',
+   LICENSE      => 'gpl',
+   SIGN         => 1,
+   PREREQ_PM    => {
+                    'warnings' => 0,
+                    'List::Util' => 0,
+                    'Image::Base' => 0,
+                    # 0.56 for robust_req() fix
+                    'X11::Protocol' => '0.56',
+                    'Test::More' => 0,
+                   },
+   MIN_PERL_VERSION => '5.004',
+
+   META_MERGE
+   => { resources
+        => { homepage => 'http://user42.tuxfamily.org/image-base-x11-protocol/index.html',
+           },
+        optional_features
+        => { maximum_devel
+             => { description => 'Stuff used variously for development.',
+                  requires => { 'Smart::Comments'     => 0,
+                              }
+                },
+           }
+      });
