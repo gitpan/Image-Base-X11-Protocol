@@ -177,8 +177,10 @@ sub check_line {
     $image->rectangle (0,0, $width-1,$height-1, $black, 1);
     $image->line ($x1,$y1, $x2,$y2, $white);
 
-    is (mung_colour($image->xy($x1,$y1)), $white, "corner of $name");
+    is (mung_colour($image->xy($x1,$y1)), $white, "corner $x1,$y1 of $name");
     is_rect ($image, $x1-1,$x2+1, $y1-1,$y2+1, $black, $name);
+
+    # dump_image ($image);
   }
 }
 

@@ -71,23 +71,23 @@ sub strip_comments {
 
 sub _meta_merge_shared_tests {
   my ($opts) = @_;
-  if (-e 't/0-Test-Pod.t') {
+  if (-e 'xt/0-Test-Pod.t') {
     _meta_merge_req_add (_meta_merge_maximum_tests($opts),
                          'Test::Pod' => '1.00');
   }
-  if (-e 't/0-Test-DistManifest.t') {
+  if (-e 'xt/0-Test-DistManifest.t') {
     _meta_merge_req_add (_meta_merge_maximum_tests($opts),
                          'Test::DistManifest' => 0);
   }
-  if (-e 't/0-Test-Synopsis.t') {
+  if (-e 'xt/0-Test-Synopsis.t') {
     _meta_merge_req_add (_meta_merge_maximum_tests($opts),
                          'Test::Synopsis' => 0);
   }
-  if (-e 't/0-Test-YAML-Meta.t') {
+  if (-e 'xt/0-Test-YAML-Meta.t') {
     _meta_merge_req_add (_meta_merge_maximum_tests($opts),
                          'Test::YAML::Meta' => '0.15');
   }
-  if (-e 't/0-META-read.t') {
+  if (-e 'xt/0-META-read.t') {
     if (_min_perl_version_lt ($opts, 5.00307)) {
       _meta_merge_req_add (_meta_merge_maximum_tests($opts),
                            'FindBin' => 0);
@@ -116,6 +116,9 @@ sub _meta_merge_maximum_tests {
 
 sub _meta_merge_shared_devel {
   my ($opts) = @_;
+  _meta_merge_req_add (_meta_merge_maximum_devel($opts),
+                       # the "make unused" target below
+                       'warnings::unused' => 0);
   if (-e 'inc/my_pod2html') {
     if (_min_perl_version_lt ($opts, 5.009003)) {
       _meta_merge_req_add (_meta_merge_maximum_devel($opts),
@@ -164,6 +167,8 @@ sub postamble {
 
   my $post = $my_options{'postamble_docs'};
 
+  my @exefiles_html;
+  my @pmfiles_html;
   unless ($my_options{'MY_NO_HTML'}) {
     $post .= <<'HERE';
 
@@ -185,7 +190,8 @@ $munghtml_extra/;
                     : ());
     my %html_files;
 
-    foreach my $pm (@exefiles, @pmfiles) {
+    my $html_rule = sub {
+      my ($pm) = @_;
       my $fullhtml = $pm;
       $fullhtml =~ s{lib/}{};     # remove lib/
       $fullhtml =~ s{\.p[ml]$}{}; # remove .pm or .pl
@@ -206,6 +212,14 @@ $parthtml: $pm Makefile
 	\$(MY_POD2HTML) $pm >$parthtml
 HERE
       }
+      return $parthtml;
+    };
+
+    foreach my $filename (@exefiles) {
+      push @exefiles_html, &$html_rule ($filename);
+    }
+    foreach my $filename (@pmfiles) {
+      push @pmfiles_html, &$html_rule ($filename);
     }
 
     $post .= "MY_HTML_FILES = " . join(' ', keys %html_files) . "\n";
@@ -230,6 +244,7 @@ HERE
     # would prefer not to lock down the 't' dir existance at ./Makefile.PL
     # time, but it's a bit hard without without GNU make extensions
     if (-d 't') { $lint_files .= ' t/*.t'; }
+    if (-d 'xt') { $lint_files .= ' xt/*.t'; }
 
     foreach my $dir ('examples', 'devel') {
       my $pattern = "$dir/*.pl";
@@ -284,9 +299,9 @@ check-copyright-years:
 	      | debian/patches/*.diff | debian/source/format \
 	      | COPYING | MANIFEST* | SIGNATURE | META.yml \
 	      | version.texi | */version.texi \
-	      | *utf16* \
-	      | */Math''Image/ln2.gz | */Math''Image/pi.gz \
-	      | *.mo | *.locatedb | t/samp.*) \
+	      | *utf16* | examples/rs''s2lea''fnode.conf \
+	      | */MathI''mage/ln2.gz | */MathI''mage/pi.gz \
+	      | *.mo | *.locatedb* | t/samp.*) \
 	        continue ;; \
 	      *.gz) GREP=zgrep ;; \
 	    esac; \
@@ -303,11 +318,10 @@ check-copyright-years:
 # only a DEBUG non-zero number is bad, so an expression can copy a debug from
 # another package
 check-debug-constants:
-	if egrep -nH 'DEBUG => [1-9]|^[ \t]*use Smart::Comments' $(EXE_FILES) $(TO_INST_PM); then exit 1; else exit 0; fi
+	if egrep -nH 'DEBUG => [1-9]|^[ \t]*use Smart::Comments' $(EXE_FILES) $(TO_INST_PM) t/*.t xt/*.t; then exit 1; else exit 0; fi
 
 check-spelling:
-	if egrep -nHi '[$][rd]elf|requrie|noticable|continous|existant|explict|agument|destionation|\bthe the\b|\bnote sure\b' -r . \
-	  | egrep -v '(MyMakeMakerExtras|Makefile|dist-deb).*grep -nH'; \
+	if find . -type f | egrep -v '(Makefile|dist-deb)' | xargs egrep --color=always -nHi '[r]efering|[w]riteable|[n]ineth|\b[o]mmitt?ed|[o]mited|[$$][rd]elf|[r]equrie|[n]oticable|[c]ontinous|[e]xistant|[e]xplict|[a]gument|[d]estionation|\b[t]he the\b|\b[n]ote sure\b'; \
 	then false; else true; fi
 
 diff-prev:
@@ -341,8 +355,8 @@ HERE
                  : "\Llib$makemaker->{'DISTNAME'}-perl");
   $post .=
     "DEBNAME = $debname\n"
-    . "DPKG_ARCH = $arch\n"
-    . <<'HERE';
+      . "DPKG_ARCH = $arch\n"
+        . <<'HERE';
 DEBVNAME = $(DEBNAME)_$(VERSION)-1
 DEBFILE = $(DEBVNAME)_$(DPKG_ARCH).deb
 
@@ -392,6 +406,28 @@ lintian-source:
 	rm -rf temp-lintian
 
 HERE
+
+  {
+    my $list_html = join(' ',@exefiles_html);
+    if (! $list_html && @pmfiles_html <= 3) {
+      $list_html = join(' ',@pmfiles_html);
+    }
+    if (! -e 'inc/my_pod2html') {
+      $list_html = '';
+    }
+    my $make_list_html = ($list_html ? "\n\tmake $list_html" : "");
+    $post .= <<"HERE";
+my-list:$make_list_html
+	ls -l -U $list_html \$(EXE_FILES) *.tar.gz *.deb
+HERE
+    $post .= <<'HERE';
+	@echo -n '$(DEBFILE) '
+	@dpkg-deb -f $(DEBFILE) | grep Installed-Size
+HERE
+    if ($list_html) {
+      $post .= "\trm -f $list_html\n";
+    }
+  }
 
   return $post;
 }

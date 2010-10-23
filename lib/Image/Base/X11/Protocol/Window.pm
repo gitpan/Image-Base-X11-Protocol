@@ -23,7 +23,7 @@ use warnings;
 use Carp;
 use vars '$VERSION', '@ISA';
 
-$VERSION = 1;
+$VERSION = 2;
 
 use Image::Base::X11::Protocol::Drawable;
 @ISA = ('Image::Base::X11::Protocol::Drawable');

@@ -1,5 +1,5 @@
 This file contains message digests of all files listed in MANIFEST,
-signed via the Module::Signature module, version 0.63.
+signed via the Module::Signature module, version 0.66.
 
 To verify the content in this distribution, first make sure you have
 Module::Signature installed, then type:
@@ -15,40 +15,40 @@ not run its Makefile.PL or Build.PL.
 Hash: SHA1
 
 SHA1 842745cb706f8f2126506f544492f7a80dbe29b3 COPYING
-SHA1 22400d7aaeebc8bd490651b3028b3c7d8c99b886 Changes
-SHA1 efc9e161dce24423ac5305d5aa69c81f6d71f9c5 MANIFEST
-SHA1 e86f3ada1c9dff20c5ee8253ea1e58470e5f892e MANIFEST.SKIP
-SHA1 fdb026d566bb862be6f4d21d4c331dc55d9e0408 META.yml
-SHA1 647b83d5468ac49384666f4dcd43220da09ed53c Makefile.PL
-SHA1 4f530fbcd3c6a1a1413859b48b94308a9741e112 debian/changelog
+SHA1 59e3938cf269c22f9a8560c44bf9e40e9e97e6ee Changes
+SHA1 afcf84a0dd2aaeef90a4e262f6a952f816073e76 MANIFEST
+SHA1 e6e7c2904ea5d300c0ddf70fc5a80f5005229aa9 MANIFEST.SKIP
+SHA1 75029d08f1b30be120f597595500bba686b26257 META.yml
+SHA1 08b5958d1b150304a952c62fb8c54bd062f5c2a9 Makefile.PL
+SHA1 c835a3398973bd070d04e8ba3277aaacb8953e2c debian/changelog
 SHA1 ac3478d69a3c81fa62e60f5c3696165a4e5e6ac4 debian/compat
-SHA1 48c0b7536143de8f1ea7de5aea42ec55afa93a5a debian/control
+SHA1 15026c45144ce21a7633075e82c2590f92deb93d debian/control
 SHA1 9c5b3cef2d5f4d6ba0ce0ca3b5a09b46b2fada0c debian/copyright
 SHA1 475fe9ee247bb0a6a157e9ec55acdf7e8f002f5b debian/rules
 SHA1 61652cd1568dcf2614df833eba241755eee34e89 debian/source/format
 SHA1 91270a1ffdd38a263f93722d343f937091b62c8e debian/watch
-SHA1 51dc6f75f94d88aef698d0df8f5bd897ae878051 devel/x11-protocol.pl
+SHA1 ce27df62a47791d13fdf3b040ce831cc89e420be devel/x11-protocol.pl
 SHA1 9c072e6725f3e335471531c362638196c3209f5f devel/xwd.pl
-SHA1 58f22e80dae0565a73e0a7d31fe1debdad48dd13 inc/MyMakeMakerExtras.pm
+SHA1 3cf3345a9177dbe362dfc8fbf192272f4a611ca8 inc/MyMakeMakerExtras.pm
 SHA1 692a1ddc2ca6b98cac7b48ea40bc1ac1509e8ed9 inc/my_pod2html
-SHA1 df8e58ca72fe8a714a9b0b986f858bfaaf0d6566 lib/Image/Base/X11/Protocol/Drawable.pm
-SHA1 f96bb3cd8892f875bdf1eac44ab6210ae6be71f2 lib/Image/Base/X11/Protocol/Pixmap.pm
-SHA1 40718028011f5fc7764dd75326eac505ddf08d92 lib/Image/Base/X11/Protocol/Window.pm
-SHA1 2a0a12208a8b081a1a588028c980c5472779453e t/0-META-read.t
-SHA1 37abd43b41068804ea4bb099fdd89af21be82926 t/0-Test-DistManifest.t
-SHA1 8f93fb4c8f0424a4442cc93c9a2e86342ef55281 t/0-Test-Pod.t
-SHA1 1de8f07883f6bf1a2ef79f2cb8adf1deb3f61cee t/0-Test-Synopsis.t
-SHA1 fb517c2fae5ddac559318bf6a224949115ea3129 t/0-Test-YAML-Meta.t
-SHA1 caa7c154629c98aadaf9308b0b756e43f7df7d48 t/Drawable.t
-SHA1 047c00f295172f0fc8acf5cc8fd7807dcfa4f427 t/MyTestHelpers.pm
-SHA1 8b8812ca1f4cb119d3858cef00a2fc98c0a2daaf t/MyTestImageBase.pm
-SHA1 d1f7cf4f731d92b05abd70d8f92d9e030f820aa9 t/Pixmap.t
+SHA1 b760c13e07d999ec01f743e622478bef2198c258 lib/Image/Base/X11/Protocol/Drawable.pm
+SHA1 76e3f28be157057359cec629f99923eb1e4446e1 lib/Image/Base/X11/Protocol/Pixmap.pm
+SHA1 a42c94d09198d43b4c5cce30baeda7ea7376078e lib/Image/Base/X11/Protocol/Window.pm
+SHA1 6ce53725a46322972fb8b26cc931f213b7c6f3b9 t/Drawable.t
+SHA1 5e5680b471811244fe93571efc23e7b6089cac3b t/MyTestHelpers.pm
+SHA1 f5104c484721657b41ae06f21a1dabbee5877f5d t/MyTestImageBase.pm
+SHA1 068a977ed172667dfdcb48c3ad156cc500c70bde t/Pixmap.t
 SHA1 d16607c43e09c1465c8e32d628222aed97582f02 t/Window-visible.t
-SHA1 57973982b72f6860fb4affa41e105c149a074de7 t/Window.t
+SHA1 3df00ae3ad53e9687531ee96e6fd8f7bb53ca8ea t/Window.t
+SHA1 9127f78a0dfa04976acbb979dd7862ef59a74c58 xt/0-META-read.t
+SHA1 37abd43b41068804ea4bb099fdd89af21be82926 xt/0-Test-DistManifest.t
+SHA1 8f93fb4c8f0424a4442cc93c9a2e86342ef55281 xt/0-Test-Pod.t
+SHA1 1de8f07883f6bf1a2ef79f2cb8adf1deb3f61cee xt/0-Test-Synopsis.t
+SHA1 fb517c2fae5ddac559318bf6a224949115ea3129 xt/0-Test-YAML-Meta.t
 -----BEGIN PGP SIGNATURE-----
 Version: GnuPG v1.4.10 (GNU/Linux)
 
-iD8DBQFMRNpCLFMCIV9q3ToRAn9RAJwLe8x5V9W0A1zF+Jy+8+WF2JydoQCguQRd
-3ARLr+rsBPV1LH0/8S8xrI8=
-=nOMe
+iD8DBQFMw2LyLFMCIV9q3ToRAiMtAJ9xZ9z1wPF7MD58s3sDwQnP+V5FeACglwrY
+bfLqR5ub7ZjEqj1NRoXrZOI=
+=pGYe
 -----END PGP SIGNATURE-----

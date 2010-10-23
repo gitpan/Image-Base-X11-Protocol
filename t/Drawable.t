@@ -36,11 +36,13 @@ BEGIN {
   # pass display arg so as not to get a "guess" warning
   eval { $X = X11::Protocol->new ($display); }
     or plan skip_all => "Cannot connect to X server -- $@";
-  $X->sync;
+  $X->QueryPointer($X->{'root'});  # sync
 
-  plan tests => 3807;
+  plan tests => 3825;
 }
+
 use_ok ('Image::Base::X11::Protocol::Drawable');
+diag "Image::Base version ", Image::Base->VERSION;
 
 # screen number integer 0, 1, etc
 sub X_chosen_screen_number {
@@ -57,7 +59,7 @@ my $X_screen_number = X_chosen_screen_number($X);
 #------------------------------------------------------------------------------
 # VERSION
 
-my $want_version = 1;
+my $want_version = 2;
 is ($Image::Base::X11::Protocol::Drawable::VERSION,
     $want_version, 'VERSION variable');
 is (Image::Base::X11::Protocol::Drawable->VERSION,
@@ -81,26 +83,73 @@ ok (! eval { Image::Base::X11::Protocol::Drawable->VERSION($check_version); 1 },
     my $got = Image::Base::X11::Protocol::Drawable::_X_rootwin_to_screen_number($X,$rootwin);
     if (! defined $got || $got != $screen_number) {
       $good = 0;
-      diag "_X_rootwin_to_screen_number() wrong on rootwin $rootwin screen $screen_number\ngot ", (defined $got ? $got : 'undef');
+      diag "_X_rootwin_to_screen_number() wrong on rootwin $rootwin screen $screen_number";
+      diag "got ", (defined $got ? $got : 'undef');
     }
   }
   ok ($good, "_X_rootwin_to_screen_number()");
 }
 
 #------------------------------------------------------------------------------
-# new()
+# root window info
 
 {
+  my $num_screens = scalar(@{$X->{'screens'}});
+  my $check_screen = $num_screens - 1;
+  my $check_screen_info = $X->{'screens'}->[$check_screen];
+  diag "num screens $num_screens, use $check_screen for checking";
+
+  my $image = Image::Base::X11::Protocol::Drawable->new
+    (-X => $X,
+     -drawable => $X->{'screens'}->[$check_screen]->{'root'});
+  isa_ok ($image, 'Image::Base');
+  isa_ok ($image, 'Image::Base::X11::Protocol::Drawable');
+
+  is ($image->VERSION,  $want_version, 'VERSION object method');
+  ok (eval { $image->VERSION($want_version); 1 },
+      "VERSION object check $want_version");
+  ok (! eval { $image->VERSION($check_version); 1 },
+      "VERSION object check $check_version");
+
+  cmp_ok ($image->get('-width'), '>=', 1, 'get() -width');
+  is ($image->get('-width'), $check_screen_info->{'width_in_pixels'},
+      'get() -width');
+
+  cmp_ok ($image->get('-height'), '>=', 1, 'get() -height');
+  is ($image->get('-height'), $check_screen_info->{'height_in_pixels'},
+      'get() -height');
+
+  cmp_ok ($image->get('-depth'), '>=', 1, 'get() -depth');
+  is ($image->get('-depth'), $check_screen_info->{'root_depth'},
+      'get() -depth');
+
+  cmp_ok ($image->get('-screen'), '>=', 0, 'get() -screen');
+  is ($image->get('-screen'), $check_screen, 'get() -screen');
+
+  # no default in the Drawable class
+  is ($image->get('-colormap'), undef, 'get() -colormap');
+}
+
+#------------------------------------------------------------------------------
+# bitmap
+{
+  my $check_screen = 0;
+  my $rootwin = $X->{'screens'}->[$check_screen]->{'root'};
+
   my $bitmap = $X->new_rsrc;
   $X->CreatePixmap ($bitmap,
-                    $X->{'root'},
+                    $rootwin,
                     1,  # depth
                     21, 10);
 
   my $image = Image::Base::X11::Protocol::Drawable->new
     (-X => $X,
-     -drawable => $bitmap,
-     -depth => 1);
+     -drawable => $bitmap);
+
+  is ($image->get('-width'),  21, 'bitmap get() -width');
+  is ($image->get('-height'), 10, 'bitmap get() -height');
+  is ($image->get('-depth'),   1, 'bitmap get() -depth');
+  is ($image->get('-screen'),  0, 'bitmap get() -screen');
 
   require MyTestImageBase;
   local $MyTestImageBase::white = 1;
@@ -108,8 +157,11 @@ ok (! eval { Image::Base::X11::Protocol::Drawable->VERSION($check_version); 1 },
   MyTestImageBase::check_image ($image);
 
   $X->FreePixmap ($bitmap);
-  $X->sync;
+  $X->QueryPointer($X->{'root'});  # sync
 }
+
+#------------------------------------------------------------------------------
+# pixmap
 
 {
   my $pixmap = $X->new_rsrc;
@@ -220,7 +272,7 @@ ok (! eval { Image::Base::X11::Protocol::Drawable->VERSION($check_version); 1 },
   MyTestImageBase::check_image ($image);
 
   $X->FreePixmap ($pixmap);
-  $X->sync;
+  $X->QueryPointer($X->{'root'});  # sync
   ok (1, 'successful destroy and sync');
 }
 

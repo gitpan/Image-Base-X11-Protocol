@@ -36,11 +36,13 @@ BEGIN {
   # pass display arg so as not to get a "guess" warning
   eval { $X = X11::Protocol->new ($display); }
     or plan skip_all => "Cannot connect to X server -- $@";
-  $X->sync;
+  $X->QueryPointer($X->{'root'});  # sync
 
   plan tests => 7;
 }
+
 use_ok ('Image::Base::X11::Protocol::Window');
+diag "Image::Base version ", Image::Base->VERSION;
 
 # screen number integer 0, 1, etc
 sub X_chosen_screen_number {
@@ -57,7 +59,7 @@ my $X_screen_number = X_chosen_screen_number($X);
 #------------------------------------------------------------------------------
 # VERSION
 
-my $want_version = 1;
+my $want_version = 2;
 is ($Image::Base::X11::Protocol::Window::VERSION,
     $want_version, 'VERSION variable');
 is (Image::Base::X11::Protocol::Window->VERSION,
@@ -97,7 +99,7 @@ ok (! eval { Image::Base::X11::Protocol::Window->VERSION($check_version); 1 },
       "-colormap default from window attributes");
 
   $X->DestroyWindow ($win);
-  $X->sync;
+  $X->QueryPointer($X->{'root'});  # sync
   ok (1, 'successful destroy and sync');
 }
 

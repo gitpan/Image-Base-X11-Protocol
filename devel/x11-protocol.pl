@@ -35,7 +35,7 @@ use MyTestImageBase;
   $ENV{'DISPLAY'} = ':0';
   my $X = X11::Protocol->new;
   # ### $X
-  $X->sync;
+  $X->QueryPointer($rootwin);  # sync
 
   my $image = Image::Base::X11::Protocol::Pixmap->new
     (-X      => $X,
@@ -51,7 +51,7 @@ use MyTestImageBase;
   # $image->rectangle (0,0, 1,1, $clear, 1);
   # $image->Image_Base_Other_rectangles ($set, 0, 0,0,0,0);
   # $image->Image_Base_Other_rectangles ($set, 0, 0,0,0,0);
-  # $X->sync;
+  # $X->QueryPointer($rootwin);  # sync
 
   #   my $gc = $image->get('-gc_created');
 
@@ -226,7 +226,7 @@ use MyTestImageBase;
   #
   #   undef $image;
   #
-  #   $X->sync;
+  # $X->QueryPointer($rootwin);  # sync
   #   $X->handle_input;
   #
   #   exit 0;
@@ -259,7 +259,7 @@ use MyTestImageBase;
   my @points = (0,0) x 500000;
   $image->Image_Base_Other_xy_points ('black', @points);
 
-  $X->sync;
+  $X->QueryPointer($rootwin);  # sync
   $X->handle_input;
 
   exit 0;
@@ -276,7 +276,7 @@ use MyTestImageBase;
   my @points = (0,0) x 65535 - 2;
   $X->PolyPoint ($rootwin, $gc, 'Origin', @points);
 
-  $X->sync;
+  $X->QueryPointer($rootwin);  # sync
   $X->handle_input;
   exit 0;
 }

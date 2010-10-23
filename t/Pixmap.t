@@ -36,11 +36,13 @@ BEGIN {
   # pass display arg so as not to get a "guess" warning
   eval { $X = X11::Protocol->new ($display); }
     or plan skip_all => "Cannot connect to X server -- $@";
-  $X->sync;
+  $X->QueryPointer($X->{'root'});  # sync
 
   plan tests => 15;
 }
+
 use_ok ('Image::Base::X11::Protocol::Pixmap');
+diag "Image::Base version ", Image::Base->VERSION;
 
 # screen number integer 0, 1, etc
 sub X_chosen_screen_number {
@@ -57,7 +59,7 @@ my $X_screen_number = X_chosen_screen_number($X);
 #------------------------------------------------------------------------------
 # VERSION
 
-my $want_version = 1;
+my $want_version = 2;
 is ($Image::Base::X11::Protocol::Pixmap::VERSION,
     $want_version, 'VERSION variable');
 is (Image::Base::X11::Protocol::Pixmap->VERSION,
@@ -89,7 +91,7 @@ ok (! eval { Image::Base::X11::Protocol::Pixmap->VERSION($check_version); 1 },
   is ($image->get('-colormap'), undef, "bitmap -colormap");
 
   $X->FreePixmap ($pixmap);
-  $X->sync;
+  $X->QueryPointer($X->{'root'});  # sync
   ok (1, 'FreePixmap and sync');
 }
 
@@ -118,7 +120,7 @@ ok (! eval { Image::Base::X11::Protocol::Pixmap->VERSION($check_version); 1 },
       "-colormap default from root window attributes");
 
   $X->FreePixmap ($pixmap);
-  $X->sync;
+  $X->QueryPointer($X->{'root'});  # sync
   ok (1, 'FreePixmap and sync');
 }
 

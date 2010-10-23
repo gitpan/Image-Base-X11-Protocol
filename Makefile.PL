@@ -26,7 +26,7 @@ use MyMakeMakerExtras;
 
 MyMakeMakerExtras::WriteMakefile
   (NAME         => 'Image-Base-X11-Protocol',
-   ABSTRACT     => 'Draw into X windows and pixmaps in Image::Base style.',
+   ABSTRACT     => 'Image::Base drawing into X windows and pixmaps using X11::Protocol.',
    VERSION_FROM => 'lib/Image/Base/X11/Protocol/Drawable.pm',
    AUTHOR       => 'Kevin Ryde <user42@zip.com.au>',
    LICENSE      => 'gpl',
@@ -49,7 +49,7 @@ MyMakeMakerExtras::WriteMakefile
         => { maximum_devel
              => { description => 'Stuff used variously for development.',
                   requires => { 'Smart::Comments'     => 0,
-                              }
+                              },
                 },
-           }
+           },
       });

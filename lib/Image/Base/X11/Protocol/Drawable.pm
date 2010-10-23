@@ -25,7 +25,7 @@ use List::Util;
 use X11::Protocol 0.56; # version 0.56 for robust_req() fix
 use vars '$VERSION', '@ISA';
 
-$VERSION = 1;
+$VERSION = 2;
 
 use Image::Base;
 @ISA = ('Image::Base');
@@ -121,33 +121,39 @@ sub get {
   local $self->{'_during_get'} = {};
   return shift->SUPER::get(@_);
 }
-my %get_geometry = (-depth         => 1,
-                    -root          => 1,
-                    -x             => 1,
-                    -y             => 1,
-                    -width         => 1,
-                    -height        => 1,
-                    -border_width  => 1,
+my %get_geometry = (-depth         => sub{$_[1]->{'root_depth'}},
+                    -root          => sub{$_[1]->{'root'}},
+                    -x             => sub{0},
+                    -y             => sub{0},
+                    -width         => sub{$_[1]->{'width_in_pixels'}},
+                    -height        => sub{$_[1]->{'height_in_pixels'}},
+                    -border_width  => sub{0},
 
-                    # with extra crunching
-                    -screen => 1);
+                    # and with extra crunching
+                    -screen        => sub{$_[0]});
 
 sub _get {
   my ($self, $key) = @_;
   ### X11-Protocol-Drawable _get(): $key
 
-  if (! exists $self->{$key} && $get_geometry{$key}) {
+  if (! exists $self->{$key}
+      && defined (my $rsubr = $get_geometry{$key})) {
     my $X = $self->{'-X'};
-    my %geom = $X->GetGeometry ($self->{'-drawable'});
+    my $drawable = $self->{'-drawable'};
 
+    if (defined (my $screen = _X_rootwin_to_screen_number ($X, $drawable))) {
+      # $drawable is a root window, grab info out of $X
+      &$rsubr ($screen, $X->{'screens'}->[$screen]);
+    }
+
+    my %geom = $X->GetGeometry ($self->{'-drawable'});
     foreach my $gkey (keys %get_geometry) {
       if (! defined $self->{$gkey}) {
         $self->{$gkey} = $geom{substr($gkey,1)};
       }
     }
     if (! defined $self->{'-screen'}) {
-      $self->{'-screen'}
-        = _X_rootwin_to_screen_number ($X, $geom{'root'});
+      $self->{'-screen'} = _X_rootwin_to_screen_number ($X, $geom{'root'});
     }
   }
   return $self->SUPER::_get($key);
@@ -165,6 +171,7 @@ sub set {
 
   if (exists $params{'-drawable'}) {
     _free_gc_created ($self);
+    # purge these cached values, %params can supply new ones if desired
     delete @{$self}{keys %get_geometry}; # hash slice
   }
   if (exists $params{'-colormap'}) {
@@ -342,7 +349,8 @@ sub Image_Base_Other_rectangles {
 sub ellipse {
   my ($self, $x1, $y1, $x2, $y2, $colour) = @_;
   ### Drawable ellipse: $x1, $y1, $x2, $y2, $colour
-  if ($x1 == $x2 || $y1 == $y2) {
+  if (abs($x1-$x2) <= 1 || abs($y1-$y2) < 1) {
+    # 1 or 2 pixels
     shift->rectangle(@_,1);
   } else {
     ### PolyArc: $x1, $y1, $x2-$x1+1, $y2-$y1+1, 0, 360*64
@@ -528,7 +536,7 @@ sub _X_rootwin_to_screen_number {
 __END__
 
 =for stopwords undef Ryde pixmap pixmaps colormap ie XID GC PseudoColor lookups
-TrueColor RGB
+TrueColor RGB drawables
 
 =head1 NAME
 
@@ -574,9 +582,9 @@ values 1 and 0 can be used directly, plus special names "set" and "clear".
 Native X drawing does much more than C<Image::Base> but if you have some
 generic pixel twiddling code for C<Image::Base> then this Drawable class
 lets you point it at an X window etc.  Drawing into a window is a good way
-to show slow drawing progressively, rather than drawing into an image file
-etc, and only displaying when complete.  See C<Image::Base::Multiplex> for a
-way to do both simultaneously.
+to show slow drawing progressively, rather than drawing into a pixmap or
+image file and only displaying when complete.  See C<Image::Base::Multiplex>
+for a way to do both simultaneously.
 
 =head1 FUNCTIONS
 
@@ -684,11 +692,22 @@ The plain drawing operations don't need the size though.
 
 =item C<-depth> (integer, read-only)
 
-The depth of the drawable, meaning how many bits per pixel.  C<get> queries
-the server when required and then caches, if C<-depth> wasn't provided in
-the C<new>.
+The depth of the drawable, meaning how many bits per pixel.
+
+=item C<-screen> (integer, read-only)
+
+The screen number of the C<-drawable>, for example 0 for the first screen.
 
 =back
+
+The depth and screen of a drawable cannot be changed, and for the purposes
+of this interface the width and height are regarded as fixed too.  If you
+C<get> the C<-width>, C<-height>, C<-depth> or C<-screen> then for a root
+window the values are obtained from the C<X11::Protocol> object data, or for
+other drawables by a C<GetGeometry> to the server.  If you already know the
+values of some of these attributes then you can include them in the C<new>
+to record them ready for later C<get> and avoid that C<GetGeometry> query.
+Of course if nothing ever does such a C<get> then there's no need.
 
 =head1 BUGS
 
@@ -704,8 +723,8 @@ property which could be both initialized or manipulated as required.
 L<Image::Base>,
 L<Image::Base::X11::Protocol::Pixmap>,
 L<Image::Base::X11::Protocol::Window>,
-L<Image::Base::Multiplex>,
-L<X11::Protocol>
+L<X11::Protocol>,
+L<Image::Base::Multiplex>
 
 =head1 HOME PAGE
 
