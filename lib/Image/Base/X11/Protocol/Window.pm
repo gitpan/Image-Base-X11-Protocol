@@ -23,7 +23,7 @@ use warnings;
 use Carp;
 use vars '$VERSION', '@ISA';
 
-$VERSION = 2;
+$VERSION = 3;
 
 use Image::Base::X11::Protocol::Drawable;
 @ISA = ('Image::Base::X11::Protocol::Drawable');
@@ -35,13 +35,17 @@ sub new {
   my ($class, %params) = @_;
   ### X11-Protocol-Window new()
 
+  # lookup -colormap from -window if not supplied
   if (! defined $params{'-colormap'}) {
     my %attrs = $params{'-X'}->GetWindowAttributes ($params{'-window'});
     $params{'-colormap'} = $attrs{'colormap'};
   }
+
+  # alias -window to -drawable
   if (my $win = delete $params{'-window'}) {
     $params{'-drawable'} = $win;
   }
+
   return $class->SUPER::new (%params);
 }
 
@@ -106,13 +110,17 @@ sub set {
 
 sub xy {
   my ($self, $x, $y, $colour) = @_;
-  if (@_ >= 4 && $colour eq 'None' &&  $self->{'-X'}->{'ext'}->{'SHAPE'}) {
-    $self->{'-X'}->ShapeRectangles ($self->{'-drawable'},
-                                    'Bounding',
-                                    'Subtract',
-                                    0,0, # offset
-                                    'YXBanded',
-                                    [ $x,$y, 1,1 ]);
+  ### Window xy(): "$x, $y".(@_>=4 && ", $colour")
+  if (@_ >= 4
+      && $colour eq 'None'
+      && (my $X = $self->{'-X'}) ->{'ext'}->{'SHAPE'}) {
+    ### subtract shape
+    $X->ShapeRectangles ($self->{'-drawable'},
+                         'Bounding',
+                         'Subtract',
+                         0,0, # offset
+                         'YXBanded',
+                         [ $x,$y, 1,1 ]);
   } else {
     shift->SUPER::xy (@_);
   }
@@ -122,7 +130,8 @@ sub line {
   my ($self, $x1,$y1, $x2,$y2, $colour) = @_;
   ### X11-Protocol-Window line(): $x1,$y1, $x2,$y2, $colour
 
-  if ($colour eq 'None' &&  (my $X = $self->{'-X'})->{'ext'}->{'SHAPE'}) {
+  if ($colour eq 'None'
+      && (my $X = $self->{'-X'}) ->{'ext'}->{'SHAPE'}) {
     my $width = $x2 - $x1 + 1;
     my $height = $y2 - $y1 + 1;
     my ($bitmap, $bitmap_gc) = _make_bitmap_and_gc ($self, $width, $height);
@@ -142,37 +151,70 @@ sub line {
 sub rectangle {
   my ($self, $x1, $y1, $x2, $y2, $colour, $fill) = @_;
   ### Window rectangle: $x1, $y1, $x2, $y2, $colour, $fill
-  if ($colour eq 'None' &&  $self->{'-X'}->{'ext'}->{'SHAPE'}) {
-    $self->{'-X'}->ShapeRectangles ($self->{'-drawable'},
-                                    'Bounding',
-                                    'Subtract',
-                                    0,0, # offset
-                                    'YXBanded',
-                                    [ $x1, $y1,
-                                      $x2 - $x1 + 1,
-                                      $y2 - $y1 + 1 ]);
+  if ($colour eq 'None'
+      && (my $X = $self->{'-X'}) ->{'ext'}->{'SHAPE'}) {
+    if ($fill
+        || abs($x1-$x2) <= 1
+        || abs($y1-$y2) <= 1) {
+      $X->ShapeRectangles ($self->{'-drawable'},
+                           'Bounding',
+                           'Subtract',
+                           0,0, # offset
+                           'YXBanded',
+                           [ $x1, $y1,
+                             $x2 - $x1 + 1,
+                             $y2 - $y1 + 1 ]);
+    } else {
+      my $width = $x2 - $x1 + 1;
+      my $height = $y2 - $y1 + 1;
+      my ($bitmap, $bitmap_gc) = _make_bitmap_and_gc ($self, $width, $height);
+      $X->PolyRectangle ($bitmap,
+                         $bitmap_gc,
+                         [ 0,0, $width-1, $height-1 ]);
+      $X->ShapeMask ($self->{'-drawable'},
+                     'Bounding',
+                     'Subtract',
+                     $x1,$y1, # offset
+                     $bitmap);
+      $X->FreePixmap ($bitmap);
+    }
   } else {
     $self->SUPER::rectangle ($x1, $y1, $x2, $y2, $colour, $fill);
   }
 }
 
 sub ellipse {
-  my ($self, $x1,$y1, $x2,$y2, $colour) = @_;
+  my ($self, $x1,$y1, $x2,$y2, $colour, $fill) = @_;
   ### Window ellipse: $x1,$y1, $x2,$y2, $colour
-  if ($colour eq 'None' &&  (my $X = $self->{'-X'})->{'ext'}->{'SHAPE'}) {
+  if ($colour eq 'None'
+      &&  (my $X = $self->{'-X'}) ->{'ext'}->{'SHAPE'}) {
     ### use shape
+    my $win = $self->{'-drawable'};
     my $width = $x2 - $x1 + 1;
     my $height = $y2 - $y1 + 1;
-    my $win = $self->{'-drawable'};
-    my ($bitmap, $bitmap_gc) = _make_bitmap_and_gc ($self, $width, $height);
-    $X->PolyArc ($bitmap, $bitmap_gc,
-                 [ 0, 0, $width, $height, 0, 365*64 ]);
-    $self->{'-X'}->ShapeMask ($self->{'-drawable'},
-                            'Bounding',
-                            'Subtract',
-                            $x1,$y1, # offset
-                            $bitmap);
-    $X->FreePixmap ($bitmap);
+    if ($width <= 2 || $height <= 2) {
+      $X->ShapeRectangles ($win,
+                           'Bounding',
+                           'Subtract',
+                           0,0, # offset
+                           'YXBanded',
+                           [ $x1, $y1, $width, $height ]);
+    } else {
+      my ($bitmap, $bitmap_gc) = _make_bitmap_and_gc ($self, $width, $height);
+      # fill+outline per comments in Drawable.pm
+      my @args = ($bitmap, $bitmap_gc, [ 0, 0, $width, $height, 0, 365*64 ]);
+      if ($fill) {
+        $X->PolyFillArc (@args);
+      }
+      $X->PolyArc (@args);
+
+      $X->ShapeMask ($self->{'-drawable'},
+                     'Bounding',
+                     'Subtract',
+                     $x1,$y1, # offset
+                     $bitmap);
+      $X->FreePixmap ($bitmap);
+    }
   } else {
     shift->SUPER::ellipse (@_);
   }
@@ -291,6 +333,12 @@ The target window.  C<-drawable> and C<-window> access the same attribute.
 
 Changing these resizes the window (C<ConfigureWindow>).  See the base
 Drawable class for the way fetching uses C<GetGeometry>.
+
+The maximum size allowed by the protocol is 32767x32767, and minimum 1x1.
+When creating or resizing currently the sizes are chopped by Perl's C<pack>
+to a signed 16 bits, which means 32768 to 65535 results in an X protocol
+error (being negatives), but for instance 65546 wraps around to 10 and will
+seem to work.
 
 In the current code a window size change made outside this wrapper
 (including perhaps by the user through the window manager) is not noticed by

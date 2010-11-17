@@ -24,7 +24,7 @@ use Carp;
 use List::Util;
 use vars '$VERSION', '@ISA';
 
-$VERSION = 2;
+$VERSION = 3;
 
 use Image::Base::X11::Protocol::Drawable;
 @ISA = ('Image::Base::X11::Protocol::Drawable');
@@ -218,6 +218,12 @@ The target pixmap.  C<-drawable> and C<-pixmap> access the same attribute.
 =item C<-height> (integer, read-only)
 
 The size of a pixmap cannot be changed once created.
+
+The maximum size allowed by the protocol is 32767x32767, and minimum 1x1.
+When creating a pixmap currently the sizes are chopped by Perl's C<pack> to
+a signed 16 bits, which means 32768 to 65535 results in an X protocol error
+(being negatives), but for instance 65546 wraps around to 10 and will seem
+to work.
 
 =back
 

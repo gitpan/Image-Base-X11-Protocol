@@ -34,6 +34,8 @@ MyMakeMakerExtras::WriteMakefile
    PREREQ_PM    => {
                     'warnings' => 0,
                     'List::Util' => 0,
+                    # ellipse() $fill done natively, so no need to depend on
+                    # Image::Base 1.12 for that
                     'Image::Base' => 0,
                     # 0.56 for robust_req() fix
                     'X11::Protocol' => '0.56',

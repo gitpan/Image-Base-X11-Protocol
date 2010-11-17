@@ -27,6 +27,7 @@ use Test::More;
 #use Smart::Comments;
 
 our $white = 'white';
+our $white_expect;
 our $black = 'black';
 
 sub mung_colour {
@@ -120,29 +121,62 @@ sub is_filled_rect {
   return $bad;
 }
 
+# demand that one or more pixels in hline have $colour
 sub some_hline {
   my ($image, $x1,$x2, $y, $colour, $name) = @_;
+  ($x1,$x2) = ($x2,$x1) if $x1 > $x2;
   foreach my $x ($x1 .. $x2) {
     ### some_hline look at: "$x,$y"
     my $got = mung_colour($image->xy($x,$y));
     if ($got eq $colour) {
-      return 0;
+      return 0; # good
     }
   }
   ok (0, "some_hline x=$x1..$x2,y=$y  $colour  on $name");
-  return 1;
+  return 1; # bad
 }
 
 sub some_vline {
   my ($image, $x, $y1,$y2, $colour, $name) = @_;
+  ($y1,$y2) = ($y2,$y1) if $y1 > $y2;
   foreach my $y ($y1 .. $y2) {
     my $got = mung_colour($image->xy($x,$y));
     if ($got eq $colour) {
-      return 0;
+      return 0; # good
     }
   }
   ok (0, "some_vline x=$x,y=$y1..$y2  $colour  on $name");
-  return 1;
+  return 1; # bad
+}
+
+# demand that all pixels $x1 to $x2 inclusive have $colour
+sub all_hline {
+  my ($image, $x1,$x2, $y, $colour, $name) = @_;
+  ($x1,$x2) = ($x2,$x1) if $x1 > $x2;
+  foreach my $x ($x1 .. $x2) {
+    ### all_hline look at: "$x,$y c=".$image->xy($x,$y)
+    my $got = mung_colour($image->xy($x,$y));
+    if ($got ne $colour) {
+      ok (0, "all_hline x=$x1..$x2,y=$y  $colour  on $name");
+      return 1; # bad
+    }
+  }
+  return 0; # good
+}
+
+# demand that all pixels $y1 to $y2 inclusive have $colour
+sub all_vline {
+  my ($image, $x, $y1,$y2, $colour, $name) = @_;
+  ($y1,$y2) = ($y2,$y1) if $y1 > $y2;
+  foreach my $y ($y1 .. $y2) {
+    ### all_hline look at: "$x,$y"
+    my $got = mung_colour($image->xy($x,$y));
+    if ($got ne $colour) {
+      ok (0, "all_vline x=$x,y=$y1..$y  $colour  on $name");
+      return 1; # bad
+    }
+  }
+  return 0; # good
 }
 
 #-----------------------------------------------------------------------------
@@ -177,7 +211,9 @@ sub check_line {
     $image->rectangle (0,0, $width-1,$height-1, $black, 1);
     $image->line ($x1,$y1, $x2,$y2, $white);
 
-    is (mung_colour($image->xy($x1,$y1)), $white, "corner $x1,$y1 of $name");
+    is (mung_colour($image->xy($x1,$y1)),
+        $white_expect,
+        "corner $x1,$y1 of $name");
     is_rect ($image, $x1-1,$x2+1, $y1-1,$y2+1, $black, $name);
 
     # dump_image ($image);
@@ -213,7 +249,7 @@ sub check_rectangle {
         $image->$method (@args);
 
         my $bad
-          = (is_rect ($image, $x1,$y1, $x2,$y2, $white, $name)
+          = (is_rect ($image, $x1,$y1, $x2,$y2, $white_expect, $name)
              # outside
              + is_rect ($image, $x1-1,$y1-1, $x2+1,$y2+1, $black, $name)
              # inside
@@ -232,7 +268,7 @@ sub check_rectangle {
         $image->$method (@args);
 
         my $bad
-          = (is_filled_rect ($image, $x1,$y1, $x2,$y2, $white, $name)
+          = (is_filled_rect ($image, $x1,$y1, $x2,$y2, $white_expect, $name)
              # outside
              + is_rect ($image, $x1-1,$y1-1, $x2+1,$y2+1, $black, $name));
         if ($bad) { dump_image($image); }
@@ -245,36 +281,50 @@ sub check_ellipse {
   my ($image, %options) = @_;
   my ($width, $height) = $image->get('-width','-height');
 
-  my $func = $options{'base_ellipse_func'} || sub { 0 };
+  my $basefunc = $options{'base_ellipse_func'} || sub { 0 };
 
   foreach my $elem (@sizes) {
     my ($x1,$y1, $x2,$y2) = @$elem;
-    my $name = "ellipse $x1,$y1, $x2,$y2";
 
-    if ($options{'base_ellipse'}
-        || $func->($x1,$y1, $x2,$y2)) {
-      next if $name eq 'ellipse 3,2, 4,2';   # dodgy
-      next if $name eq 'ellipse 3,2, 13,2';  # dodgy
-      next if $name eq 'ellipse 1,1, 18,8';  # dodgy
-      next if $name eq 'ellipse 3,3, 4,3';   # dodgy
-      next if $name eq 'ellipse 1,1, 2,2';   # dodgy
-      next if $name eq 'ellipse 3,3, 13,3';  # dodgy
+    foreach my $fillaref ([], [1]) {
+      my $fill = ($fillaref->[0] || 0);
+      my $name = "ellipse $x1,$y1, $x2,$y2, fill=$fill";
+
+      # if ($options{'base_ellipse'}
+      #     || $basefunc->($x1,$y1, $x2,$y2)) {
+      #   next if $name eq 'ellipse 3,2, 4,2';   # dodgy
+      #   next if $name eq 'ellipse 3,2, 13,2';  # dodgy
+      #   next if $name eq 'ellipse 1,1, 18,8';  # dodgy
+      #   next if $name eq 'ellipse 3,3, 4,3';   # dodgy
+      #   next if $name eq 'ellipse 1,1, 2,2';   # dodgy
+      #   next if $name eq 'ellipse 3,3, 13,3';  # dodgy
+      # }
+
+      $image->rectangle (0,0, $width-1,$height-1, $black, 1);
+      $image->ellipse ($x1,$y1, $x2,$y2, $white, @$fillaref);
+
+      my $bad = (some_hline ($image, $x1,$x2, $y1, $white_expect, $name)
+                 + some_hline ($image, $x1,$x2, $y2, $white_expect, $name)
+                 + some_vline ($image, $x1, $y1,$y2, $white_expect, $name)
+                 + some_vline ($image, $x2, $y1,$y2, $white_expect, $name)
+                 + is_rect ($image, $x1-1,$y1-1, $x2+1,$y2+1, $black, $name)
+                );
+      if ($fill) {
+        $bad += (all_hline ($image, $x1,$x2, int(($y1+$y2)/2), $white_expect,$name)
+                 + all_hline ($image, $x1,$x2, int(($y1+$y2+1)/2), $white_expect,$name)
+                 + all_vline ($image, int(($x1+$x2)/2), $y1,$y2, $white_expect,$name)
+                 + all_vline ($image, int(($x1+$x2+1)/2), $y1,$y2, $white_expect ,$name)
+                );
+      }
+      if ($bad) { dump_image($image); }
     }
-
-    $image->rectangle (0,0, $width-1,$height-1, $black, 1);
-    $image->ellipse ($x1,$y1, $x2,$y2, $white);
-
-    my $bad = (some_hline ($image, $x1,$x2, $y1, $white, $name)
-               + some_hline ($image, $x1,$x2, $y2, $white, $name)
-               + some_vline ($image, $x1, $y1,$y2, $white, $name)
-               + some_vline ($image, $x2, $y1,$y2, $white, $name)
-               + is_rect ($image, $x1-1,$y1-1, $x2+1,$y2+1, $black, $name));
-    if ($bad) { dump_image($image); }
   }
 }
 
 sub check_image {
   my ($image, @options) = @_;
+  local $white_expect = $white_expect || $white;
+
   check_line ($image);
   check_rectangle ($image);
   check_ellipse ($image, @options);

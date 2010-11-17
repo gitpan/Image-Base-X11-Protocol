@@ -25,7 +25,7 @@ use List::Util;
 use X11::Protocol 0.56; # version 0.56 for robust_req() fix
 use vars '$VERSION', '@ISA';
 
-$VERSION = 2;
+$VERSION = 3;
 
 use Image::Base;
 @ISA = ('Image::Base');
@@ -279,13 +279,13 @@ sub rectangle {
   my ($self, $x1, $y1, $x2, $y2, $colour, $fill) = @_;
   ### X11-Protocol-Drawable rectangle
   if ($x1 == $x2 || $y1 == $y2) {
-    # single pixel wide or high
+    # single pixel wide or high, must treat as filled as PolyRectangle draws
+    # nothing if it's passed width==0 or height==0
     $fill = 1;
   } else {
     $fill = !!$fill;  # 0 or 1
   }
-  my $method = ($fill ? 'PolyFillRectangle' : 'PolyRectangle');
-  ### $method
+  ### method: ($fill ? 'PolyFillRectangle' : 'PolyRectangle')
   ### coords: [ $x1, $y1, $x2-$x1, $y2-$y1 ]
 
   $self->{'-X'}->request (($fill ? 'PolyFillRectangle' : 'PolyRectangle'),
@@ -346,16 +346,56 @@ sub Image_Base_Other_rectangles {
   }
 }
 
+# The Arc requests take the bounding region at
+#    left   x,       y+(h/2)
+#    right  x+w,     y+(h/2)
+#    top    x+(w/2), y
+#    bottom x+(w/2), y+h
+# with w=x2-x1, h=y2-y1.
+#
+# For PolyArc a 1-wide line makes each of those pixels drawn, but a
+# PolyFillArc is only the inside, not the extra 0.5 around the outside,
+# which means the bottom and right endmost pixels not drawn, and others a
+# bit smaller than PolyArc.
+#
+# For now try a PolyArc on top of the PolyFillArc to get the extra 0.5
+# around the outside.  Can it be done better?  Prima has this, as long as
+# the drawing mode isn't xor etc where duplicated pixels are bad.
+#
+# One possibility would be to set line width lw=min(w/2,h/2) rounded up to
+# next odd integer, and shrink the bounding box by (lw-1)/2, so a PolyLine
+# centred there goes out to the very edges of the x1,y1,x2,y2 box, not just
+# the centres of those pixels, and being w/2 or h/2 will extend in to cover
+# the centre.  The disadvantage would be changing the line width for each
+# draw, or keep another gc, and that might take away the option for the user
+# to set in a '-gc' option to choose between zero-width fast lines and
+# 1-width exact lines.  An advantage though would be a single draw operation
+# meaning an "xor" mode in the gc would cover the right pixels.  There's
+# something in the PolyArc spec about the bounding box being implementation
+# dependent if width!=height, so maybe this wouldn't work always.
+#
+# The same bounding box centred on the pixels happens in rectangle(), but
+# can be handled there by +1 on the width and height.  A +1 doesn't make a
+# filled ellipse come out the same as an outlined ellipse though.
+#
+# same in Window.pm for shape stuff
 sub ellipse {
-  my ($self, $x1, $y1, $x2, $y2, $colour) = @_;
+  my ($self, $x1, $y1, $x2, $y2, $colour, $fill) = @_;
   ### Drawable ellipse: $x1, $y1, $x2, $y2, $colour
   if (abs($x1-$x2) <= 1 || abs($y1-$y2) < 1) {
-    # 1 or 2 pixels
-    shift->rectangle(@_,1);
+    # 1 or 2 pixels wide or high
+    shift->rectangle(@_);
   } else {
     ### PolyArc: $x1, $y1, $x2-$x1+1, $y2-$y1+1, 0, 360*64
-    $self->{'-X'}->PolyArc ($self->{'-drawable'}, _gc_colour($self,$colour),
-                            [ $x1, $y1, $x2-$x1, $y2-$y1, 0, 360*64 ]);
+    my @args = ($self->{'-drawable'},
+                _gc_colour($self,$colour),
+                [ $x1, $y1, $x2-$x1, $y2-$y1,
+                  0, 360*64 ]);
+    my $X = $self->{'-X'};
+    if ($fill) {
+      $X->PolyFillArc (@args);
+    }
+    $X->PolyArc (@args);
   }
 }
 
@@ -449,7 +489,7 @@ sub add_colours {
       }
 
       # can't track more than 65535 sequence numbers, do chunks
-      last if @queued > 32768;
+      last if @queued > 2048;
 
       my $elem = { colour => $colour };
       my @req;
@@ -463,7 +503,7 @@ sub add_colours {
         $elem->{'named'} = 1;
         @req = ('AllocNamedColor', $colormap, $colour);
       }
-      my $seq = $elem->{'seq'} = $X->send(@req) & 0xFFFF;
+      my $seq = $elem->{'seq'} = $X->send(@req);
       $X->add_reply ($seq, \$elem->{'data'});
 
       ### $elem
@@ -574,7 +614,7 @@ The subclasses C<Image::Base::X11::Protocol::Pixmap> and
 C<Image::Base::X11::Protocol::Window> have things specific to a pixmap or
 window respectively.  Drawable is the common parts.
 
-Colour names are anything known to the X server (usually in the file
+Colour names are anything known to the X server (usually from the file
 F</etc/X11/rgb.txt>), or 2-digit or 4-digit hex #RRGGBB and #RRRRGGGGBBBB.
 Colours used are allocated in a specified C<-colormap>.  For bitmaps pixel
 values 1 and 0 can be used directly, plus special names "set" and "clear".
@@ -583,8 +623,8 @@ Native X drawing does much more than C<Image::Base> but if you have some
 generic pixel twiddling code for C<Image::Base> then this Drawable class
 lets you point it at an X window etc.  Drawing into a window is a good way
 to show slow drawing progressively, rather than drawing into a pixmap or
-image file and only displaying when complete.  See C<Image::Base::Multiplex>
-for a way to do both simultaneously.
+image file and only displaying when complete.  Or see
+C<Image::Base::Multiplex> for a way to do both simultaneously.
 
 =head1 FUNCTIONS
 
@@ -605,13 +645,6 @@ normally).
 
 =cut
 
-# Not quite yet documented ...
-#
-# Optional C<-gc> can set a GC (an integer XID) to use for drawing, otherwise
-# a new one is created if/when needed and freed when the image is destroyed.
-# The C<$image> will consider itself the exclusive user of the C<-gc>
-# provided.
-
 =item C<$colour = $image-E<gt>xy ($x, $y)>
 
 =item C<$image-E<gt>xy ($x, $y, $colour)>
@@ -623,11 +656,11 @@ slow.  The protocol allows a big region or an entire drawable to be read in
 one go, so some function for that could be made if needed.
 
 In the current code the colour returned is either the name used to draw it,
-or looked up in the C<-colormap> to give 4-digit hex #RRRRGGGGBBBB, or
-otherwise a raw pixel value.  If two colour names became the same pixel
-value because that was as close as could be represented then fetching might
-give either name.  The hex return is 4 digits because that's the range in
-the X protocol.
+or 4-digit hex #RRRRGGGGBBBB queried from the C<-colormap>, or otherwise a
+raw pixel value.  If two colour names became the same pixel value because
+that was as close as could be represented then fetching might give either
+name.  The hex return is 4 digit components because that's the range in the
+X protocol.
 
 If the drawable is a window then parts overlapped by another window
 (including a sub-window) generally read back as an unspecified value.  Parts
@@ -651,14 +684,23 @@ are taken from the screen info and don't query the server (neither in the
 drawing operations nor C<add_colours>).
 
 All colours, both named and hex, are sent to the server for interpretation.
-On a static visual like TrueColor a hex RGB could in principle be turned
-into a pixel just on the client side, but the X specs allow non-linear
-weirdness in how pixel values ramp to RGB component levels, so only the
-server can do it properly.
+On a static visual like TrueColor a hex RGB might in principle be turned
+into a pixel just on the client side, but the X spec allows non-linear
+weirdness in colour ramps, so only the server can do it properly.
 
 =back
 
 =head1 ATTRIBUTES
+
+=cut
+
+# Not documented yet ... not sure what the effect of a wide line filled
+# ellipse would be too ...
+#
+# Optional C<-gc> can set a GC (an integer XID) to use for drawing, otherwise
+# a new one is created if/when needed and freed when the image is destroyed.
+# The C<$image> will consider itself the exclusive user of the C<-gc>
+# provided.
 
 =over
 

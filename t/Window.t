@@ -59,7 +59,7 @@ my $X_screen_number = X_chosen_screen_number($X);
 #------------------------------------------------------------------------------
 # VERSION
 
-my $want_version = 2;
+my $want_version = 3;
 is ($Image::Base::X11::Protocol::Window::VERSION,
     $want_version, 'VERSION variable');
 is (Image::Base::X11::Protocol::Window->VERSION,

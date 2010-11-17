@@ -38,11 +38,14 @@ BEGIN {
     or plan skip_all => "Cannot connect to X server -- $@";
   $X->QueryPointer($X->{'root'});  # sync
 
-  plan tests => 3825;
+  plan tests => 4284;
 }
 
 use_ok ('Image::Base::X11::Protocol::Drawable');
 diag "Image::Base version ", Image::Base->VERSION;
+
+# uncomment this to run the ### lines
+#use Smart::Comments;
 
 # screen number integer 0, 1, etc
 sub X_chosen_screen_number {
@@ -59,7 +62,7 @@ my $X_screen_number = X_chosen_screen_number($X);
 #------------------------------------------------------------------------------
 # VERSION
 
-my $want_version = 2;
+my $want_version = 3;
 is ($Image::Base::X11::Protocol::Drawable::VERSION,
     $want_version, 'VERSION variable');
 is (Image::Base::X11::Protocol::Drawable->VERSION,
@@ -275,5 +278,82 @@ ok (! eval { Image::Base::X11::Protocol::Drawable->VERSION($check_version); 1 },
   $X->QueryPointer($X->{'root'});  # sync
   ok (1, 'successful destroy and sync');
 }
+
+#------------------------------------------------------------------------------
+# add_colours()
+
+sub _next_seq_num {
+  my ($X) = @_;
+  my $seq = $X->send('QueryPointer',$X->{'root'});
+  my $reply;
+  $X->add_reply ($seq, \$reply);
+  $X->handle_input_for($seq);
+  $X->delete_reply ($seq);
+  return $seq;
+}
+
+sub _run_seq_to_FF00 {
+  my ($X) = @_;
+  my $target = 0xFF00;
+  my $limit = 100;
+  my $count = 0;
+  my $seq = _next_seq_num($X);
+
+  for (;;) {
+    my $diff = ($target - $seq) & 0xFFFF;
+    ### $diff
+    if ($diff < 10) {
+      diag "_run_seq_to_FF00() $count steps to seq $seq";
+      last;
+    }
+    my @pending;
+    for (;;) {
+      last if ($diff < 10 || @pending > 2048);
+      $seq = $X->send('QueryPointer',$X->{'root'});
+      push @pending, $seq;
+      my $reply;
+      $X->add_reply ($seq, \$reply);
+      $count++;
+      $diff--;
+    }
+    $X->handle_input_for($seq);
+    foreach my $pending (@pending) {
+      $X->delete_reply ($pending);
+    }
+    if (--$limit < 0) {
+      diag "_run_seq_to_FF00(): oops, cannot get seq to 0xFF00";
+      die;
+    }
+  }
+}
+
+{
+  my $pixmap = $X->new_rsrc;
+  $X->CreatePixmap ($pixmap,
+                    $X->{'root'},
+                    $X->{'root_depth'},
+                    21, 10);
+  my $image = Image::Base::X11::Protocol::Drawable->new
+    (-X => $X,
+     -drawable => $pixmap,
+     -colormap => $X->{'default_colormap'});
+
+  {
+    my @colours = map {sprintf('#%06X',$_)} 0 .. 5000;
+    diag "add_colours() ",scalar(@colours);
+    $image->add_colours(@colours);
+  }
+  {
+    my @colours = map {sprintf('#%06X',$_)} 5001 .. 10000;
+    diag "add_colours() ",scalar(@colours)," with seq wraparound";
+    _run_seq_to_FF00($X);
+    $image->add_colours(@colours);
+  }
+
+  $X->FreePixmap ($pixmap);
+  $X->QueryPointer($X->{'root'});  # sync
+  ok (1, 'successful destroy and sync');
+}
+
 
 exit 0;
