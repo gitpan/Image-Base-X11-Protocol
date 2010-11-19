@@ -99,7 +99,7 @@ $visibility eq 'Unobscured'
   or plan skip_all => "window not visible: $visibility";
 
 
-plan tests => 2144;
+plan tests => 2345;
 MyTestImageBase::check_image ($image);
 
 # resetting from None?

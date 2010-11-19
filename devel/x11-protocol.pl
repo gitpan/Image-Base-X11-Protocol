@@ -33,6 +33,7 @@ use MyTestImageBase;
 {
   $ENV{'DISPLAY'} = ':0';
   my $X = X11::Protocol->new;
+  ### $X
   my $rootwin = $X->{'root'};
 
   my $w = 32768;

@@ -37,9 +37,8 @@ BEGIN {
   eval { $X = X11::Protocol->new ($display); }
     or plan skip_all => "Cannot connect to X server -- $@";
   $X->QueryPointer($X->{'root'});  # sync
-
-  plan tests => 4284;
 }
+plan tests => 4686;
 
 use_ok ('Image::Base::X11::Protocol::Drawable');
 diag "Image::Base version ", Image::Base->VERSION;
@@ -59,10 +58,42 @@ sub X_chosen_screen_number {
 }
 my $X_screen_number = X_chosen_screen_number($X);
 
+
+diag "";
+diag "X server info";
+diag "vendor: ",$X->{'vendor'};
+diag "release_number: ",$X->{'release_number'};
+diag "protocol_major_version: ",$X->{'protocol_major_version'};
+diag "protocol_minor_version: ",$X->{'protocol_minor_version'};
+diag "byte_order: ",$X->{'byte_order'};
+diag "num screens: ",scalar(@{$X->{'screens'}});
+diag "width_in_pixels: ",$X->{'width_in_pixels'};
+diag "height_in_pixels: ",$X->{'height_in_pixels'};
+diag "width_in_millimeters: ",$X->{'width_in_millimeters'};
+diag "height_in_millimeters: ",$X->{'height_in_millimeters'};
+diag "root_visual: ",$X->{'root_visual'};
+{
+  my $visual = $X->{'visuals'}->{$X->{'root_visual'}};
+  diag "  depth: ",$visual->{'depth'};
+  diag "  class: ",$visual->{'class'},
+    ' ', $X->interp('VisualClass', $visual->{'class'});
+  diag "  colormap_entries: ",$visual->{'colormap_entries'};
+  diag "  bits_per_rgb_value: ",$visual->{'bits_per_rgb_value'};
+  diag "  red_mask: ",sprintf('%#X',$visual->{'red_mask'});
+  diag "  green_mask: ",sprintf('%#X',$visual->{'green_mask'});
+  diag "  blue_mask: ",sprintf('%#X',$visual->{'blue_mask'});
+}
+diag "image_byte_order: ",$X->{'image_byte_order'},
+  ' ', $X->interp('Significance', $X->{'image_byte_order'});
+diag "black_pixel: ",sprintf('%#X',$X->{'black_pixel'});
+diag "white_pixel: ",sprintf('%#X',$X->{'white_pixel'});
+diag "";
+
+
 #------------------------------------------------------------------------------
 # VERSION
 
-my $want_version = 3;
+my $want_version = 4;
 is ($Image::Base::X11::Protocol::Drawable::VERSION,
     $want_version, 'VERSION variable');
 is (Image::Base::X11::Protocol::Drawable->VERSION,
@@ -100,7 +131,7 @@ ok (! eval { Image::Base::X11::Protocol::Drawable->VERSION($check_version); 1 },
   my $num_screens = scalar(@{$X->{'screens'}});
   my $check_screen = $num_screens - 1;
   my $check_screen_info = $X->{'screens'}->[$check_screen];
-  diag "num screens $num_screens, use $check_screen for checking";
+  diag "use screen number $check_screen for checking";
 
   my $image = Image::Base::X11::Protocol::Drawable->new
     (-X => $X,
@@ -154,6 +185,7 @@ ok (! eval { Image::Base::X11::Protocol::Drawable->VERSION($check_version); 1 },
   is ($image->get('-depth'),   1, 'bitmap get() -depth');
   is ($image->get('-screen'),  0, 'bitmap get() -screen');
 
+  diag "MyTestImageBase on bitmap";
   require MyTestImageBase;
   local $MyTestImageBase::white = 1;
   local $MyTestImageBase::black = 0;
@@ -269,6 +301,7 @@ ok (! eval { Image::Base::X11::Protocol::Drawable->VERSION($check_version); 1 },
   is ($image->xy (8,8), 'black');
   #
 
+  diag "MyTestImageBase on pixmap depth=$X->{'root_depth'}";
   require MyTestImageBase;
   local $MyTestImageBase::white = 'white';
   local $MyTestImageBase::black = 'black';

@@ -25,7 +25,7 @@ use List::Util;
 use X11::Protocol 0.56; # version 0.56 for robust_req() fix
 use vars '$VERSION', '@ISA';
 
-$VERSION = 3;
+$VERSION = 4;
 
 use Image::Base;
 @ISA = ('Image::Base');
@@ -215,7 +215,7 @@ sub xy {
   # X11::Protocol 0.56 shows named 'LeastSiginificant' in the pod, but the
   # code gives raw number '0'
   if ($X->{'image_byte_order'} eq 'LeastSiginificant'
-      || $X->{'image_byte_order'} eq 0) {
+      || $X->{'image_byte_order'} eq '0') {
     #### reverse for LSB image format
     $bytes = reverse $bytes;
   }
@@ -223,6 +223,11 @@ sub xy {
   #### $visual
   #### $bytes
   my $pixel = unpack ('N', $bytes);
+
+  # not sure what the protocol says about extra bits or bytes in the reply
+  # data, have seen a freebsd server giving garbage, so mask the extras
+  $pixel &= (1 << $depth) - 1;
+
   #### pixel: sprintf '%X', $pixel
   #### pixel_to_colour: $self->pixel_to_colour($pixel)
   if (defined ($colour = $self->pixel_to_colour($pixel))) {

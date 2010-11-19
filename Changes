@@ -16,6 +16,9 @@ You can get a copy of the GNU General Public License online at
 <http://www.gnu.org/licenses/>.
 
 
+Version 4, November 2010
+    - xy() fetching mask GetImage possible garbage in extra bits/bytes
+
 Version 3, November 2010
     - ellipse() new $fill parameter
     - Window rectangle() fix unfilled colour "None" shaping
