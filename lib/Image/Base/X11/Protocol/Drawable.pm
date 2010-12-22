@@ -23,12 +23,12 @@ use warnings;
 use Carp;
 use List::Util;
 use X11::Protocol 0.56; # version 0.56 for robust_req() fix
-use vars '$VERSION', '@ISA';
-
-$VERSION = 4;
+use vars '@ISA', '$VERSION';
 
 use Image::Base;
 @ISA = ('Image::Base');
+
+$VERSION = 5;
 
 # uncomment this to run the ### lines
 #use Smart::Comments;
@@ -473,83 +473,83 @@ sub add_colours {
     || croak 'No -colormap to add colours to';
   my $colour_to_pixel = $self->{'-colour_to_pixel'};
   my $pixel_to_colour = $self->{'-pixel_to_colour'};
-
+  
   my @queued;
   my @failed_colours;
-  while (@_) {
-
-  COLOUR: while (@_) {
-      my $colour = shift;
-      next if defined $colour_to_pixel->{$colour};  # already known
-      delete $self->{'-pixel_to_colour'};
-
-      if (my $field = $colour_to_screen_info_field{$colour}) {
-        if (my $screen_info = _X_colormap_to_screen_info($X,$colormap)) {
-          my $pixel = $colour_to_pixel->{$colour} = $screen_info->{$field};
-          if ($pixel_to_colour) {
-            $pixel_to_colour->{$pixel} = $colour;
-          }
-          next COLOUR;
-        }
+  
+  my $old_error_handler = $X->{'error_handler'};
+  my $wait_queue = sub {
+    my $elem = shift @queued;
+    my $seq = $elem->{'seq'};
+    my $colour = $elem->{'colour'};
+    
+    my $err;
+    local $X->{'error_handler'} = sub {
+      my ($X, $data) = @_;
+      my ($type, $err_seq) = unpack("xCSLSCxxxxxxxxxxxxxxxxxxxxx", $data);
+      if ($err_seq != $seq) {
+        goto &$old_error_handler;
       }
-
-      # can't track more than 65535 sequence numbers, do chunks
-      last if @queued > 2048;
-
-      my $elem = { colour => $colour };
-      my @req;
-
-      # Crib: [:xdigit:] new in 5.6, so just 0-9A-F for now
-      if (my @rgb = ($colour =~ /^#([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})$/i)) {
-        @req = ('AllocColor', $colormap, map {hex() * 65535/255} @rgb);
-      } elsif (@rgb = ($colour =~ /^#([0-9A-F]{4})([0-9A-F]{4})([0-9A-F]{4})$/i)) {
-        @req = ('AllocColor', $colormap, map {hex} @rgb);
-      } else {
-        $elem->{'named'} = 1;
-        @req = ('AllocNamedColor', $colormap, $colour);
-      }
-      my $seq = $elem->{'seq'} = $X->send(@req);
-      $X->add_reply ($seq, \$elem->{'data'});
-
-      ### $elem
-      push @queued, $elem;
+      $err = 1;
+    };
+    
+    ### handle: $seq
+    $X->handle_input_for ($seq);
+    $X->delete_reply ($seq);
+    if ($err) {
+      push @failed_colours, $colour;
+      next;
     }
+    
+    ### reply: $X->unpack_reply($elem->{'request_type'}, $elem->{'reply'})
+    
+    my ($pixel) = $X->unpack_reply ($elem->{'request_type'}, $elem->{'reply'});
+    $colour_to_pixel->{$colour} = $pixel;
+    if ($pixel_to_colour) {
+      $pixel_to_colour->{$pixel} = $colour;
+    }
+  };
 
-    my $old_error_handler;
-    while (my $elem = shift @queued) {
-      my $seq = $elem->{'seq'};
-      my $colour = $elem->{'colour'};
+  while (@_) {
+    my $colour = shift;
+    next if defined $colour_to_pixel->{$colour};  # already known
+    delete $self->{'-pixel_to_colour'};
 
-      my $err;
-      local $X->{'error_handler'} = sub {
-        my ($X, $data) = @_;
-        my ($type, $err_seq) = unpack("xCSLSCxxxxxxxxxxxxxxxxxxxxx", $data);
-        if ($err_seq != $seq) {
-          goto &$old_error_handler;
+    # black_pixel or white_pixel of a default colormap
+    if (my $field = $colour_to_screen_info_field{$colour}) {
+      if (my $screen_info = _X_colormap_to_screen_info($X,$colormap)) {
+        my $pixel = $colour_to_pixel->{$colour} = $screen_info->{$field};
+        if ($pixel_to_colour) {
+          $pixel_to_colour->{$pixel} = $colour;
         }
-        $err = 1;
-      };
-
-      ### handle: $seq
-      $X->handle_input_for ($seq);
-      $X->delete_reply ($seq);
-      if ($err) {
-        push @failed_colours, $colour;
         next;
       }
+    }
 
-      ### named reply: $elem->{'named'} && $X->unpack_reply('AllocNamedColor', $elem->{'data'})
-      ### plain reply: ! $elem->{'named'} && $X->unpack_reply('AllocColor', $elem->{'data'})
+    my $elem = { colour => $colour };
+    my @req;
+    # Crib: [:xdigit:] new in 5.6, so just 0-9A-F for now
+    if (my @rgb = ($colour =~ /^#([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})$/i)) {
+      @req = ('AllocColor', $colormap, map {hex() * 65535/255} @rgb);
+    } elsif (@rgb = ($colour =~ /^#([0-9A-F]{4})([0-9A-F]{4})([0-9A-F]{4})$/i)) {
+      @req = ('AllocColor', $colormap, map {hex} @rgb);
+    } else {
+      @req = ('AllocNamedColor', $colormap, $colour);
+    }
+    $elem->{'request_type'} = $req[0];
+    my $seq = $elem->{'seq'} = $X->send(@req);
+    $X->add_reply ($seq, \$elem->{'reply'});
 
-      my ($pixel) = ($elem->{'named'}
-                     ? $X->unpack_reply ('AllocNamedColor', $elem->{'data'})
-                     : $X->unpack_reply ('AllocColor', $elem->{'data'}));
-      $colour_to_pixel->{$colour} = $pixel;
-      if ($pixel_to_colour) {
-        $pixel_to_colour->{$pixel} = $colour;
-      }
+    ### $elem
+    push @queued, $elem;
+    if (@queued > 256) {
+      &$wait_queue();
     }
   }
+  while (@queued) {
+    &$wait_queue();
+  }
+
   if (@failed_colours) {
     die "Unknown colour(s): ",join(', ', @failed_colours);
   }
@@ -626,8 +626,8 @@ values 1 and 0 can be used directly, plus special names "set" and "clear".
 
 Native X drawing does much more than C<Image::Base> but if you have some
 generic pixel twiddling code for C<Image::Base> then this Drawable class
-lets you point it at an X window etc.  Drawing into a window is a good way
-to show slow drawing progressively, rather than drawing into a pixmap or
+lets you point it at an X window etc.  Drawing directly into a window is a
+good way to show slow drawing progressing, rather than drawing a pixmap or
 image file and only displaying when complete.  Or see
 C<Image::Base::Multiplex> for a way to do both simultaneously.
 
@@ -680,18 +680,18 @@ drawing functions.  For example,
 
     $image->add_colours ('red', 'green', '#FF00FF');
 
-The drawing functions automatically add a colour if it doesn't already exist
-but using C<add_colours> can do a set of pixel lookups in a single server
-round-trip instead of separate individual ones.
+Drawing automatically adds a colour if it doesn't already exist but using
+C<add_colours> can do a set of pixel lookups in a single server round-trip
+instead of separate individual ones.
 
 If using the default colormap of the screen then names "black" and "white"
 are taken from the screen info and don't query the server (neither in the
 drawing operations nor C<add_colours>).
 
 All colours, both named and hex, are sent to the server for interpretation.
-On a static visual like TrueColor a hex RGB might in principle be turned
-into a pixel just on the client side, but the X spec allows non-linear
-weirdness in colour ramps, so only the server can do it properly.
+On a static visual like TrueColor a hex RGB might be turned into a pixel
+just on the client side, but the X spec allows non-linear weirdness in the
+colour ramps so only the server can do it properly.
 
 =back
 
@@ -756,14 +756,46 @@ values of some of these attributes then you can include them in the C<new>
 to record them ready for later C<get> and avoid that C<GetGeometry> query.
 Of course if nothing ever does such a C<get> then there's no need.
 
+=head1 ALGORITHMS
+
+C<ellipse> uses C<PolyArc> for a line centred on the boundary pixels, being
+the midpoints of the C<$y1> row, C<$y2> row, C<$x1> column, etc.  The way
+the "centre within the shape" rule works should mean that circles are
+symmetric, but the X protocol spec allows the server some implementation
+dependent latitude for ellipses width!=height.
+
+A filled ellipse uses the X11 C<FillArc>, but its shape is the inside of the
+ellipse centred on the boundary pixels, which is effectively 1/2 a pixel in
+from the ellipse line edge, and in particular the "centre on the boundary
+drawn if above or left" rule means the bottom row and rightmost column
+aren't drawn at all.  The current strategy is to draw a C<PolyArc> on top
+for the extra 1/2 pixel radius.
+
+For a circle an alternative strategy would be to set the line width to half
+the radius and draw half again of that in from the edges so that the line
+extends from the centre of the box to the outer edges.  The way a line comes
+out as linewidth/2 each side makes a resolution of 1/2 pixel possible.  The
+disadvantage would be changing the GC each time, and which might be
+undesirable if it came from the user (an as-yet undocumented C<-gc>
+attribute).  Note also this is no good for an ellipse width!=height because
+if you draw a fixed distance out tangent to an ellipse the resulting shape
+is not a bigger ellipse, it's a bit fatter than an ellipse.
+
+The C<FillArc> plus C<PolyArc> combination ends up drawing some pixels
+twice, which is no good for an "xor" gc operation.  Currently that doesn't
+arise for C<Image::Base::X11::Protocol::Drawable>, but if there was a user
+supplied C<-gc> then more care might be wanted.  At worst the base
+C<Image::Base> code could be left to handle it all, or draw onto a temporary
+bitmap mask, or something like that.
+
 =head1 BUGS
 
 The pixel values for each colour used in drawing are cached for later
 re-use.  This is important to avoid a server round-trip on every drawing
 operation, but if you use a lot of different shades then the cache may
 become big.  Perhaps some sort of least recently used discard could keep a
-lid on it.  The intention is probably to have a colour-to-pixel or some such
-property which could be both initialized or manipulated as required.
+lid on it.  The intention is probably to have a colour-to-pixel hash or some
+such attribute which could be both initialized or manipulated as required.
 
 =head1 SEE ALSO
 

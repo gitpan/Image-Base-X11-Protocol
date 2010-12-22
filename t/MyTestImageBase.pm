@@ -17,6 +17,12 @@
 # You should have received a copy of the GNU General Public License along
 # with this file.  If not, see <http://www.gnu.org/licenses/>.
 
+
+# wide/high ellipse cases
+# fill check no gaps
+# fill check concave
+
+
 package MyTestImageBase;
 use strict;
 use warnings;
@@ -189,6 +195,7 @@ sub all_vline {
   }
   return 0; # good
 }
+
 
 #-----------------------------------------------------------------------------
 

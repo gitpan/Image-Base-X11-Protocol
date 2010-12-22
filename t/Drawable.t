@@ -38,7 +38,7 @@ BEGIN {
     or plan skip_all => "Cannot connect to X server -- $@";
   $X->QueryPointer($X->{'root'});  # sync
 }
-plan tests => 4686;
+plan tests => 4688;
 
 use_ok ('Image::Base::X11::Protocol::Drawable');
 diag "Image::Base version ", Image::Base->VERSION;
@@ -93,7 +93,7 @@ diag "";
 #------------------------------------------------------------------------------
 # VERSION
 
-my $want_version = 4;
+my $want_version = 5;
 is ($Image::Base::X11::Protocol::Drawable::VERSION,
     $want_version, 'VERSION variable');
 is (Image::Base::X11::Protocol::Drawable->VERSION,
@@ -315,7 +315,7 @@ ok (! eval { Image::Base::X11::Protocol::Drawable->VERSION($check_version); 1 },
 #------------------------------------------------------------------------------
 # add_colours()
 
-sub _next_seq_num {
+sub step_seq_num {
   my ($X) = @_;
   my $seq = $X->send('QueryPointer',$X->{'root'});
   my $reply;
@@ -325,18 +325,18 @@ sub _next_seq_num {
   return $seq;
 }
 
-sub _run_seq_to_FF00 {
+sub run_seq_to_FF00 {
   my ($X) = @_;
   my $target = 0xFF00;
   my $limit = 100;
   my $count = 0;
-  my $seq = _next_seq_num($X);
+  my $seq = step_seq_num($X);
 
   for (;;) {
     my $diff = ($target - $seq) & 0xFFFF;
     ### $diff
     if ($diff < 10) {
-      diag "_run_seq_to_FF00() $count steps to seq $seq";
+      diag "run_seq_to_FF00() $count steps to seq $seq";
       last;
     }
     my @pending;
@@ -354,10 +354,15 @@ sub _run_seq_to_FF00 {
       $X->delete_reply ($pending);
     }
     if (--$limit < 0) {
-      diag "_run_seq_to_FF00(): oops, cannot get seq to 0xFF00";
+      diag "run_seq_to_FF00(): oops, cannot get seq to 0xFF00";
       die;
     }
   }
+}
+
+my $rgb = 2;
+sub next_test_colour {
+  return sprintf('#%06X',$rgb++);
 }
 
 {
@@ -372,14 +377,29 @@ sub _run_seq_to_FF00 {
      -colormap => $X->{'default_colormap'});
 
   {
-    my @colours = map {sprintf('#%06X',$_)} 0 .. 5000;
+    diag "add_colours() error received";
+    my $error_seen = 0;
+    local $X->{'error_handler'} = sub {
+      $error_seen = 1;
+    };
+    $X->send('QueryPointer',0);
+
+    my $colour = next_test_colour();
+    $image->add_colours($colour);
+    is ($error_seen, 1, 'add_colours() with pending error - error handled');
+    ok (defined $image->{'-colour_to_pixel'}->{$colour},
+        'add_colours() with pending error - colour allocated');
+  }
+
+  {
+    my @colours = map {next_test_colour()} 1 .. 5000;
     diag "add_colours() ",scalar(@colours);
     $image->add_colours(@colours);
   }
   {
-    my @colours = map {sprintf('#%06X',$_)} 5001 .. 10000;
+    my @colours = map {next_test_colour()} 1 .. 5000;
     diag "add_colours() ",scalar(@colours)," with seq wraparound";
-    _run_seq_to_FF00($X);
+    run_seq_to_FF00($X);
     $image->add_colours(@colours);
   }
 

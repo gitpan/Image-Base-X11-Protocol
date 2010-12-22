@@ -21,12 +21,12 @@ use 5.004;
 use strict;
 use warnings;
 use Carp;
-use vars '$VERSION', '@ISA';
-
-$VERSION = 4;
+use vars '@ISA', '$VERSION';
 
 use Image::Base::X11::Protocol::Drawable;
 @ISA = ('Image::Base::X11::Protocol::Drawable');
+
+$VERSION = 5;
 
 # uncomment this to run the ### lines
 #use Smart::Comments;

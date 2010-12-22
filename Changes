@@ -16,6 +16,10 @@ You can get a copy of the GNU General Public License online at
 <http://www.gnu.org/licenses/>.
 
 
+Version 5, December 2010
+    - add_colours() fix dispatch to prev error handler, use a sliding
+      window instead of batches
+
 Version 4, November 2010
     - xy() fetching mask GetImage possible garbage in extra bits/bytes
 

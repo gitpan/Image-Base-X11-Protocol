@@ -69,7 +69,9 @@ sub findrefs {
   defined $obj or return;
   require Scalar::Util;
   if (ref $obj && Scalar::Util::reftype($obj) eq 'HASH') {
-    Test::More::diag ("Keys: ", join(',', keys %$obj), "\n");
+    Test::More::diag ("Keys: ",
+                      join(' ',
+                           map {"$_=$obj->{$_}"} keys %$obj));
   }
   if (eval { require Devel::FindRef }) {
     Test::More::diag (Devel::FindRef::track($obj, 8));
