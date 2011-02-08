@@ -15,41 +15,43 @@ not run its Makefile.PL or Build.PL.
 Hash: SHA1
 
 SHA1 842745cb706f8f2126506f544492f7a80dbe29b3 COPYING
-SHA1 d702f92d3dc16e456b71bb02aaab1e8976216227 Changes
-SHA1 5d2455e538f5a84b252b387d616981e744b617f3 MANIFEST
-SHA1 e6e7c2904ea5d300c0ddf70fc5a80f5005229aa9 MANIFEST.SKIP
-SHA1 b97418ab2e639d744cc1d9fa100d99f29c00a31e META.yml
-SHA1 6dcc78378035ae6ccce87415c225d0c969a255cc Makefile.PL
-SHA1 31b6fc97a96746d5976f7ef9df1ad0e35ce80c8e debian/changelog
+SHA1 b9f2a0757cda1fce0ff9140063760965019ed329 Changes
+SHA1 1edf834fe6ce68f2d6e24bbc768a4952d3517056 MANIFEST
+SHA1 6c771cc4b0718f7bc9c9af01889700d7bce0a8e6 MANIFEST.SKIP
+SHA1 f58b24844a8befd50480521874b160003fbbd8d6 META.yml
+SHA1 c4956d54566985964893c3bbb6df026fe54bfaa2 Makefile.PL
+SHA1 68ae40ffb7bfdaafa9756a9d408704d8e82244a9 debian/changelog
 SHA1 ac3478d69a3c81fa62e60f5c3696165a4e5e6ac4 debian/compat
-SHA1 15026c45144ce21a7633075e82c2590f92deb93d debian/control
-SHA1 9c5b3cef2d5f4d6ba0ce0ca3b5a09b46b2fada0c debian/copyright
+SHA1 4085e9b4e24be20a9941868249690efb5f187aaf debian/control
+SHA1 bb4764cfd93a1e58d614bd145c1f41cfe360ae62 debian/copyright
 SHA1 475fe9ee247bb0a6a157e9ec55acdf7e8f002f5b debian/rules
 SHA1 61652cd1568dcf2614df833eba241755eee34e89 debian/source/format
 SHA1 91270a1ffdd38a263f93722d343f937091b62c8e debian/watch
 SHA1 a45222b732998f2f1c2aabaa7e3373b43f2e52cc devel/seq-wrap.pl
 SHA1 8993aab38839c6c3fa42ad98061110f3562b381e devel/x11-protocol.pl
 SHA1 9c072e6725f3e335471531c362638196c3209f5f devel/xwd.pl
-SHA1 4fb53efe76b3b2264eaa4cf7780cb0c4923e18a5 inc/MyMakeMakerExtras.pm
-SHA1 692a1ddc2ca6b98cac7b48ea40bc1ac1509e8ed9 inc/my_pod2html
-SHA1 abc7efdb3218784f5269e3ef60366081723242b1 lib/Image/Base/X11/Protocol/Drawable.pm
-SHA1 8e1586efa6775e9980110aa309669629fac7606e lib/Image/Base/X11/Protocol/Pixmap.pm
-SHA1 a8a541d9940c7157f58ffa4a30fa2d0cd760849a lib/Image/Base/X11/Protocol/Window.pm
-SHA1 52f2902ba586e8d8708c9f29266367b5d6f32b5f t/Drawable.t
-SHA1 d2f58e66e0965c50aefc0479cd5712e8df53336e t/MyTestHelpers.pm
-SHA1 52cd7b888faaadb34e3547305224eb55a1da23cd t/MyTestImageBase.pm
-SHA1 c14945fe5b846e960f789758f15b3b20521d71be t/Pixmap.t
-SHA1 378a57965d9622bd1c5de63470ca5a91a6d824a8 t/Window-visible.t
-SHA1 fbc9f19c847eb1e57d4698c1edac6e60fa167f86 t/Window.t
-SHA1 9127f78a0dfa04976acbb979dd7862ef59a74c58 xt/0-META-read.t
-SHA1 37abd43b41068804ea4bb099fdd89af21be82926 xt/0-Test-DistManifest.t
-SHA1 8f93fb4c8f0424a4442cc93c9a2e86342ef55281 xt/0-Test-Pod.t
-SHA1 1de8f07883f6bf1a2ef79f2cb8adf1deb3f61cee xt/0-Test-Synopsis.t
-SHA1 fb517c2fae5ddac559318bf6a224949115ea3129 xt/0-Test-YAML-Meta.t
+SHA1 cf647ee28a7aaad9896d0063f8a2529919ccfcd3 inc/MyMakeMakerExtras.pm
+SHA1 7a988b2aa7ed09f1cb9029a1ef3f0e2139dca0cf inc/my_pod2html
+SHA1 270afa0044a79243070bc3544bc4c12e4d92e2de lib/Image/Base/X11/Protocol/Drawable.pm
+SHA1 61ec77f2b086e8c79f7c60441b411a59f45f6abb lib/Image/Base/X11/Protocol/Pixmap.pm
+SHA1 1422b97f4ebe6eb7a1d4b50ebb01e554dd1bf352 lib/Image/Base/X11/Protocol/Window.pm
+SHA1 9c35ff31c7aad10dc821546ef53247086f3ce12e t/Drawable-load.t
+SHA1 631495cc427259d7c3b468c045ed1b3444410a02 t/Drawable.t
+SHA1 36b8eba56c87d62b1b41959187c717577dc16fa5 t/MyTestHelpers.pm
+SHA1 a75f20cb81375b7fe648fdcdf217a19f05b80e41 t/MyTestImageBase.pm
+SHA1 6fbea4dd0fffc1fb6711ba3689370b1691c6fa73 t/Pixmap.t
+SHA1 0209aad325c7f2bda9915ddabad5f31ada8d17e6 t/Window-load.t
+SHA1 333e87cd604a236c690aab830c63be80dee850f6 t/Window-visible.t
+SHA1 83dc2b314269ed2807fc52359b6337c3b863cfcf t/Window.t
+SHA1 0279c9310ec528d10a2a14e602bf98f1c776cce1 xt/0-META-read.t
+SHA1 8a5e0f34131de34e584fbb1939c191a152566155 xt/0-Test-DistManifest.t
+SHA1 cc04a5fe5d8b8b38bfd56453d5d2686c8ea58783 xt/0-Test-Pod.t
+SHA1 8cc52e23427a82cfef5802bf512b13c65de2687a xt/0-Test-Synopsis.t
+SHA1 4c14845872d6eb4280e12f862d6ba2c343358c60 xt/0-Test-YAML-Meta.t
 -----BEGIN PGP SIGNATURE-----
 Version: GnuPG v1.4.10 (GNU/Linux)
 
-iD8DBQFNEnVRLFMCIV9q3ToRAsbfAKCIzbqWc3Dr79VC0y0+aTxrx+pFYACfcQ5q
-TLS1PDC2vGKqSrTpRj4naVI=
-=1DpQ
+iD8DBQFNUI6LLFMCIV9q3ToRAtJlAKCZN9u3mdLkWvHKUAihTJt13AFWnwCffyBa
+PWi5yIpIl8fu8p6kyHCnwdM=
+=tmBk
 -----END PGP SIGNATURE-----

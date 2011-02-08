@@ -1,4 +1,4 @@
-# Copyright 2010 Kevin Ryde
+# Copyright 2010, 2011 Kevin Ryde
 
 # This file is part of Image-Base-X11-Protocol.
 #
@@ -19,7 +19,6 @@
 package Image::Base::X11::Protocol::Drawable;
 use 5.004;
 use strict;
-use warnings;
 use Carp;
 use List::Util;
 use X11::Protocol 0.56; # version 0.56 for robust_req() fix
@@ -28,7 +27,7 @@ use vars '@ISA', '$VERSION';
 use Image::Base;
 @ISA = ('Image::Base');
 
-$VERSION = 5;
+$VERSION = 6;
 
 # uncomment this to run the ### lines
 #use Smart::Comments;
@@ -51,17 +50,17 @@ sub new {
 # is it worth the trouble though?
 #
 # =item C<$new_image = $image-E<gt>new_from_image ($class, key=E<gt>value,...)>
-# 
+#
 # Create and return a new image of type C<$class>.
-# 
+#
 # Target class C<Image::Base::X11::Protocol::Pixmap> is recognised and done by
 # CopyArea of the C<$image> drawable into the new pixmap.  Other classes are
 # left to the plain C<Image::Base> C<new_from_image>.
-# 
+#
 # sub new_from_image {
 #   my $self = shift;
 #   my $new_class = shift;
-# 
+#
 #   if (! ref $new_class
 #       && $new_class->isa('Image::Base::X11::Protocol::Pixmap')) {
 #     my %param = @_;
@@ -74,9 +73,9 @@ sub new {
 #       if ($new_screen == $screen
 #           && $new_depth == $depth
 #           && $new_colormap == $colormap) {
-# 
+#
 #         my $new_image = $new_class->new (%param);
-# 
+#
 #         ### copy to new Pixmap
 #         my ($width, $height) = $self->get('-width','-height');
 #         my ($new_width, $new_height) = $new_image->get('-width','-height');
@@ -463,6 +462,8 @@ my %colour_to_screen_info_field
      'white'         => 'white_pixel',
      '#FFFFFF'       => 'white_pixel',
      '#FFFFFFFFFFFF' => 'white_pixel',
+     '#ffffff'       => 'white_pixel',
+     '#ffffffffffff' => 'white_pixel',
     );
 
 sub add_colours {
@@ -473,16 +474,16 @@ sub add_colours {
     || croak 'No -colormap to add colours to';
   my $colour_to_pixel = $self->{'-colour_to_pixel'};
   my $pixel_to_colour = $self->{'-pixel_to_colour'};
-  
+
   my @queued;
   my @failed_colours;
-  
+
   my $old_error_handler = $X->{'error_handler'};
   my $wait_queue = sub {
     my $elem = shift @queued;
     my $seq = $elem->{'seq'};
     my $colour = $elem->{'colour'};
-    
+
     my $err;
     local $X->{'error_handler'} = sub {
       my ($X, $data) = @_;
@@ -492,7 +493,7 @@ sub add_colours {
       }
       $err = 1;
     };
-    
+
     ### handle: $seq
     $X->handle_input_for ($seq);
     $X->delete_reply ($seq);
@@ -500,9 +501,9 @@ sub add_colours {
       push @failed_colours, $colour;
       next;
     }
-    
+
     ### reply: $X->unpack_reply($elem->{'request_type'}, $elem->{'reply'})
-    
+
     my ($pixel) = $X->unpack_reply ($elem->{'request_type'}, $elem->{'reply'});
     $colour_to_pixel->{$colour} = $pixel;
     if ($pixel_to_colour) {
@@ -581,7 +582,7 @@ sub _X_rootwin_to_screen_number {
 __END__
 
 =for stopwords undef Ryde pixmap pixmaps colormap ie XID GC PseudoColor lookups
-TrueColor RGB drawables
+TrueColor RGB drawables gc
 
 =head1 NAME
 
@@ -811,7 +812,7 @@ http://user42.tuxfamily.org/image-base-x11-protocol/index.html
 
 =head1 LICENSE
 
-Image-Base-X11-Protocol is Copyright 2010 Kevin Ryde
+Image-Base-X11-Protocol is Copyright 2010, 2011 Kevin Ryde
 
 Image-Base-X11-Protocol is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License as published by

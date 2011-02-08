@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# Copyright 2010 Kevin Ryde
+# Copyright 2010, 2011 Kevin Ryde
 
 # This file is part of Image-Base-X11-Protocol.
 #
@@ -19,7 +19,6 @@
 
 use 5.004;
 use strict;
-use warnings;
 use ExtUtils::MakeMaker;
 use lib 'inc';
 use MyMakeMakerExtras;
@@ -32,7 +31,6 @@ MyMakeMakerExtras::WriteMakefile
    LICENSE      => 'gpl',
    SIGN         => 1,
    PREREQ_PM    => {
-                    'warnings' => 0,
                     'List::Util' => 0,
                     # ellipse() $fill done natively, so no need to depend on
                     # Image::Base 1.12 for that
@@ -43,15 +41,15 @@ MyMakeMakerExtras::WriteMakefile
                    },
    MIN_PERL_VERSION => '5.004',
 
-   META_MERGE
-   => { resources
-        => { homepage => 'http://user42.tuxfamily.org/image-base-x11-protocol/index.html',
-           },
-        optional_features
-        => { maximum_devel
-             => { description => 'Stuff used variously for development.',
-                  requires => { 'Smart::Comments'     => 0,
-                              },
-                },
-           },
-      });
+   META_MERGE =>
+   { resources =>
+     { homepage => 'http://user42.tuxfamily.org/image-base-x11-protocol/index.html',
+     },
+     optional_features =>
+     { maximum_devel =>
+       { description => 'Stuff used variously for development.',
+         requires => { 'Smart::Comments'     => 0,
+                     },
+       },
+     },
+   });

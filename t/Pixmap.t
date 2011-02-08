@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# Copyright 2010 Kevin Ryde
+# Copyright 2010, 2011 Kevin Ryde
 
 # This file is part of Image-Base-X11-Protocol.
 #
@@ -19,7 +19,6 @@
 
 use 5.004;
 use strict;
-use warnings;
 use Test::More;
 
 use lib 't';
@@ -59,7 +58,7 @@ my $X_screen_number = X_chosen_screen_number($X);
 #------------------------------------------------------------------------------
 # VERSION
 
-my $want_version = 5;
+my $want_version = 6;
 is ($Image::Base::X11::Protocol::Pixmap::VERSION,
     $want_version, 'VERSION variable');
 is (Image::Base::X11::Protocol::Pixmap->VERSION,

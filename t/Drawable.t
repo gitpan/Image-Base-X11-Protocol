@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# Copyright 2010 Kevin Ryde
+# Copyright 2010, 2011 Kevin Ryde
 
 # This file is part of Image-Base-X11-Protocol.
 #
@@ -19,7 +19,6 @@
 
 use 5.004;
 use strict;
-use warnings;
 use Test::More;
 
 use lib 't';
@@ -93,7 +92,7 @@ diag "";
 #------------------------------------------------------------------------------
 # VERSION
 
-my $want_version = 5;
+my $want_version = 6;
 is ($Image::Base::X11::Protocol::Drawable::VERSION,
     $want_version, 'VERSION variable');
 is (Image::Base::X11::Protocol::Drawable->VERSION,
@@ -109,6 +108,7 @@ ok (! eval { Image::Base::X11::Protocol::Drawable->VERSION($check_version); 1 },
 # _X_rootwin_to_screen_number()
 
 {
+  ## no critic (ProtectPrivateSubs)
   my $screens_aref = $X->{'screens'};
   my $good = 1;
   foreach my $screen_number (0 .. $#$screens_aref) {
@@ -230,7 +230,7 @@ ok (! eval { Image::Base::X11::Protocol::Drawable->VERSION($check_version); 1 },
 
   diag "add_colours()";
   $image->set('-colormap', $X->{'default_colormap'});
-  $image->add_colours('black', 'white', '#FF00FF', '#0000AAAAbbbb');
+  $image->add_colours('black', 'white', '#FF00FF', '#00ff00', '#0000AAAAbbbb');
 
   #
   # line

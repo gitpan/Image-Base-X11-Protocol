@@ -1,4 +1,4 @@
-Copyright 2010 Kevin Ryde
+Copyright 2010, 2011 Kevin Ryde
 
 This file is part of Image-Base-X11-Protocol.
 
@@ -15,6 +15,11 @@ General Public License for more details.
 You can get a copy of the GNU General Public License online at
 <http://www.gnu.org/licenses/>.
 
+
+
+Version 6, February 2011
+    - fix Makefile.PL for perl 5.6 and earlier
+    - hex white lower case #ffffff and #ffffffffffff too
 
 Version 5, December 2010
     - add_colours() fix dispatch to prev error handler, use a sliding

@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# Copyright 2010 Kevin Ryde
+# Copyright 2010, 2011 Kevin Ryde
 
 # This file is part of Image-Base-X11-Protocol.
 #
@@ -23,7 +23,6 @@
 
 use 5.004;
 use strict;
-use warnings;
 use Test::More;
 
 use lib 't';
