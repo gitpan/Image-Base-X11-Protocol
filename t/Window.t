@@ -19,29 +19,37 @@
 
 use 5.004;
 use strict;
-use Test::More;
+use Test;
+use X11::Protocol;
 
 use lib 't';
 use MyTestHelpers;
 BEGIN { MyTestHelpers::nowarnings() }
 
-use X11::Protocol;
-my $X;
-BEGIN {
-  my $display = $ENV{'DISPLAY'};
-  defined $display
-    or plan skip_all => 'No DISPLAY set';
+my $test_count = 6;
+plan tests => $test_count;
 
-  # pass display arg so as not to get a "guess" warning
-  eval { $X = X11::Protocol->new ($display); }
-    or plan skip_all => "Cannot connect to X server -- $@";
-  $X->QueryPointer($X->{'root'});  # sync
-
-  plan tests => 7;
+my $display = $ENV{'DISPLAY'};
+if (! defined $display) {
+  foreach (1 .. $test_count) {
+    skip ('No DISPLAY set', 1, 1);
+  }
+  exit 0;
 }
 
-use_ok ('Image::Base::X11::Protocol::Window');
-diag "Image::Base version ", Image::Base->VERSION;
+# pass display arg so as not to get a "guess" warning
+my $X;
+if (! eval { $X = X11::Protocol->new ($display); }) {
+  my $why = "Cannot connect to X server -- $@";
+  foreach (1 .. $test_count) {
+    skip ($why, 1, 1);
+  }
+  exit 0;
+}
+$X->QueryPointer($X->{'root'});  # sync
+
+require Image::Base::X11::Protocol::Window;
+MyTestHelpers::diag ("Image::Base version ", Image::Base->VERSION);
 
 # screen number integer 0, 1, etc
 sub X_chosen_screen_number {
@@ -58,16 +66,20 @@ my $X_screen_number = X_chosen_screen_number($X);
 #------------------------------------------------------------------------------
 # VERSION
 
-my $want_version = 6;
-is ($Image::Base::X11::Protocol::Window::VERSION,
-    $want_version, 'VERSION variable');
-is (Image::Base::X11::Protocol::Window->VERSION,
-    $want_version, 'VERSION class method');
+my $want_version = 7;
+ok ($Image::Base::X11::Protocol::Window::VERSION,
+    $want_version,
+    'VERSION variable');
+ok (Image::Base::X11::Protocol::Window->VERSION,
+    $want_version,
+    'VERSION class method');
 
 ok (eval { Image::Base::X11::Protocol::Window->VERSION($want_version); 1 },
+    1,
     "VERSION class check $want_version");
 my $check_version = $want_version + 1000;
 ok (! eval { Image::Base::X11::Protocol::Window->VERSION($check_version); 1 },
+    1,
     "VERSION class check $check_version");
 
 #------------------------------------------------------------------------------
@@ -93,13 +105,13 @@ ok (! eval { Image::Base::X11::Protocol::Window->VERSION($check_version); 1 },
     (-X => $X,
      -window => $win);
 
-  is ($image->get('-colormap'),
+  ok ($image->get('-colormap'),
       $win_attrs{'colormap'},
       "-colormap default from window attributes");
 
   $X->DestroyWindow ($win);
   $X->QueryPointer($X->{'root'});  # sync
-  ok (1, 'successful destroy and sync');
+  ok (1, 1, 'successful destroy and sync');
 }
 
 exit 0;

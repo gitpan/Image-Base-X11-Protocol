@@ -23,24 +23,38 @@
 
 use 5.004;
 use strict;
-use Test::More;
+use Test;
+my $test_count;
+BEGIN {
+  $test_count = 2313;
+  plan tests => $test_count;
+}
 
 use lib 't';
 use MyTestHelpers;
 BEGIN { MyTestHelpers::nowarnings() }
+use MyTestImageBase;
 
 use X11::Protocol;
 use Image::Base::X11::Protocol::Window;
-use MyTestImageBase;
 
 my $X;
 my $display = $ENV{'DISPLAY'};
-defined $display
-  or plan skip_all => 'No DISPLAY set';
+if (! defined $display) {
+  foreach (1 .. $test_count) {
+    skip ('No DISPLAY set', 1, 1);
+  }
+  exit 0;
+}
 
 # pass display arg so as not to get a "guess" warning
-eval { $X = X11::Protocol->new ($display); }
-  or plan skip_all => "Cannot connect to X server -- $@";
+if (! eval { $X = X11::Protocol->new ($display); }) {
+  my $why = "Cannot connect to X server -- $@";
+  foreach (1 .. $test_count) {
+    skip ($why, 1, 1);
+  }
+  exit 0;
+}
 
 my $width = 100;
 my $height = 100;
@@ -68,12 +82,32 @@ my $event_mask = $X->pack_event_mask('VisibilityChange',
 my $visibility = 'no VisibilityNotify event seen';
 $X->{'event_handler'} = sub {
   my (%event) = @_;
-  diag "event ",$event{'name'};
+  MyTestHelpers::diag("event ",$event{'name'});
   if ($event{'name'} eq 'VisibilityNotify') {
-    diag "visibility ",$event{'state'};
     $visibility = $event{'state'};
+    $MyTestImageBase::skip = ($visibility eq 'Unobscured'
+                            ? undef
+                            : "window not visible: $visibility");
+    MyTestHelpers::diag ("  visibility now ", $event{'state'});
+    MyTestHelpers::diag ("  skip now ", $MyTestImageBase::skip);
   }
 };
+
+# use IO::Select;
+# sub X_handle_input_nonblock {
+#   my ($X) = @_;
+#   $X->flush;
+#   my $sel = ($X->{__PACKAGE__.'.sel'}
+#              ||= IO::Select->new($X->{'connection'}->fh));
+#   while ($sel->can_read) {
+#     MyTestHelpers::diag ("handle_input()");
+#     $X->handle_input;
+#   }
+# }
+$MyTestImageBase::handle_input = sub {
+  $X->QueryPointer($X->{'root'});  # sync
+};
+
 $X->CreateWindow($win, $under_win,
                  'InputOutput',
                  $X->root_depth,
@@ -94,11 +128,6 @@ my $image = Image::Base::X11::Protocol::Window->new
   (-X => $X,
    -window => $win);
 
-$visibility eq 'Unobscured'
-  or plan skip_all => "window not visible: $visibility";
-
-
-plan tests => 2345;
 MyTestImageBase::check_image ($image);
 
 # resetting from None?
@@ -107,12 +136,12 @@ MyTestImageBase::check_image ($image);
 # SKIP: {
 #   $X->init_extension('SHAPE')
 #     or skip 'SHAPE extension not available', 2144;
-# 
+#
 #   $image->rectangle (0,0, $width-1,$height-1, '#000000', 0);
 #   # $image->xy(0,0, 'None');
 #   # is ($image->xy(0,0), '#FFFFFFFFFFFF',
 #   #     'xy() pixel see through to under win');
-# 
+#
 #   # $MyTestImageBase::black = 'black';
 #   # $MyTestImageBase::white = 'None';
 #   # $MyTestImageBase::white_expect = 'white';

@@ -20,13 +20,12 @@ package Image::Base::X11::Protocol::Pixmap;
 use 5.004;
 use strict;
 use Carp;
-use List::Util;
 use vars '@ISA', '$VERSION';
 
 use Image::Base::X11::Protocol::Drawable;
 @ISA = ('Image::Base::X11::Protocol::Drawable');
 
-$VERSION = 6;
+$VERSION = 7;
 
 # uncomment this to run the ### lines
 #use Smart::Comments;
@@ -87,9 +86,15 @@ sub new {
   return $class->SUPER::new (%params);
 }
 
+# note: no List::Util for 5.004
 sub _X_rootwin_to_screen_info {
   my ($X, $rootwin) = @_;
-  return List::Util::first {$_->{'root'} eq $rootwin} @{$X->{'screens'}};
+  foreach my $screen_info (@{$X->{'screens'}}) {
+    if ($screen_info->{'root'} eq $rootwin) {
+      return $screen_info;
+    }
+  }
+  return undef;
 }
 
 sub _get {

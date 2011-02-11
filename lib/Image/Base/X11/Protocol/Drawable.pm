@@ -20,14 +20,13 @@ package Image::Base::X11::Protocol::Drawable;
 use 5.004;
 use strict;
 use Carp;
-use List::Util;
 use X11::Protocol 0.56; # version 0.56 for robust_req() fix
 use vars '@ISA', '$VERSION';
 
 use Image::Base;
 @ISA = ('Image::Base');
 
-$VERSION = 6;
+$VERSION = 7;
 
 # uncomment this to run the ### lines
 #use Smart::Comments;
@@ -289,7 +288,6 @@ sub rectangle {
   } else {
     $fill = !!$fill;  # 0 or 1
   }
-  ### method: ($fill ? 'PolyFillRectangle' : 'PolyRectangle')
   ### coords: [ $x1, $y1, $x2-$x1, $y2-$y1 ]
 
   $self->{'-X'}->request (($fill ? 'PolyFillRectangle' : 'PolyRectangle'),
@@ -558,11 +556,16 @@ sub add_colours {
 
 # return $X->{'screens'}->[$n] hashref, or undef if $colormap is not the
 # default colormap of some screen
+# note: no List::Util for 5.004
 sub _X_colormap_to_screen_info {
   my ($X, $colormap) = @_;
-  return List::Util::first
-    {$_->{'default_colormap'} eq $colormap}
-      @{$X->{'screens'}};
+  #### _X_colormap_to_screen_info(): $colormap
+  foreach my $screen_info (@{$X->{'screens'}}) {
+    if ($screen_info->{'default_colormap'} == $colormap) {
+      return $screen_info;
+    }
+  }
+  return undef;
 }
 
 sub _X_rootwin_to_screen_number {

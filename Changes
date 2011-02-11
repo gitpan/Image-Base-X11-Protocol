@@ -17,6 +17,9 @@ You can get a copy of the GNU General Public License online at
 
 
 
+Version 7, February 2011
+    - tests allow for window becoming obscured during testing
+
 Version 6, February 2011
     - fix Makefile.PL for perl 5.6 and earlier
     - hex white lower case #ffffff and #ffffffffffff too
