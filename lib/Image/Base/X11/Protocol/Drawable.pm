@@ -21,12 +21,13 @@ use 5.004;
 use strict;
 use Carp;
 use X11::Protocol 0.56; # version 0.56 for robust_req() fix
+use X11::Protocol::Other;
 use vars '@ISA', '$VERSION';
 
 use Image::Base;
 @ISA = ('Image::Base');
 
-$VERSION = 7;
+$VERSION = 8;
 
 # uncomment this to run the ### lines
 #use Smart::Comments;
@@ -139,7 +140,7 @@ sub _get {
     my $X = $self->{'-X'};
     my $drawable = $self->{'-drawable'};
 
-    if (defined (my $screen = _X_rootwin_to_screen_number ($X, $drawable))) {
+    if (defined (my $screen = X11::Protocol::Other::root_to_screen ($X, $drawable))) {
       # $drawable is a root window, grab info out of $X
       &$rsubr ($screen, $X->{'screens'}->[$screen]);
     }
@@ -151,7 +152,7 @@ sub _get {
       }
     }
     if (! defined $self->{'-screen'}) {
-      $self->{'-screen'} = _X_rootwin_to_screen_number ($X, $geom{'root'});
+      $self->{'-screen'} = X11::Protocol::Other::root_to_screen ($X, $geom{'root'});
     }
   }
   return $self->SUPER::_get($key);
@@ -453,7 +454,7 @@ sub colour_to_pixel {
   return $self->{'-colour_to_pixel'}->{$colour};
 }
 
-my %colour_to_screen_info_field
+my %colour_to_screen_field
   = ('black'         => 'black_pixel',
      '#000000'       => 'black_pixel',
      '#000000000000' => 'black_pixel',
@@ -497,7 +498,7 @@ sub add_colours {
     $X->delete_reply ($seq);
     if ($err) {
       push @failed_colours, $colour;
-      next;
+      return;
     }
 
     ### reply: $X->unpack_reply($elem->{'request_type'}, $elem->{'reply'})
@@ -515,8 +516,8 @@ sub add_colours {
     delete $self->{'-pixel_to_colour'};
 
     # black_pixel or white_pixel of a default colormap
-    if (my $field = $colour_to_screen_info_field{$colour}) {
-      if (my $screen_info = _X_colormap_to_screen_info($X,$colormap)) {
+    if (my $field = $colour_to_screen_field{$colour}) { # "black" or "white"
+      if (my $screen_info = X11::Protocol::Other::default_colormap_to_screen_info($X,$colormap)) {
         my $pixel = $colour_to_pixel->{$colour} = $screen_info->{$field};
         if ($pixel_to_colour) {
           $pixel_to_colour->{$pixel} = $colour;
@@ -527,9 +528,9 @@ sub add_colours {
 
     my $elem = { colour => $colour };
     my @req;
-    # Crib: [:xdigit:] new in 5.6, so just 0-9A-F for now
+    # Crib: [:xdigit:] new in 5.6, so only 0-9A-F
     if (my @rgb = ($colour =~ /^#([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})$/i)) {
-      @req = ('AllocColor', $colormap, map {hex() * 65535/255} @rgb);
+      @req = ('AllocColor', $colormap, map {hex() * 0x101} @rgb);
     } elsif (@rgb = ($colour =~ /^#([0-9A-F]{4})([0-9A-F]{4})([0-9A-F]{4})$/i)) {
       @req = ('AllocColor', $colormap, map {hex} @rgb);
     } else {
@@ -552,33 +553,6 @@ sub add_colours {
   if (@failed_colours) {
     die "Unknown colour(s): ",join(', ', @failed_colours);
   }
-}
-
-# return $X->{'screens'}->[$n] hashref, or undef if $colormap is not the
-# default colormap of some screen
-# note: no List::Util for 5.004
-sub _X_colormap_to_screen_info {
-  my ($X, $colormap) = @_;
-  #### _X_colormap_to_screen_info(): $colormap
-  foreach my $screen_info (@{$X->{'screens'}}) {
-    if ($screen_info->{'default_colormap'} == $colormap) {
-      return $screen_info;
-    }
-  }
-  return undef;
-}
-
-sub _X_rootwin_to_screen_number {
-  my ($X, $rootwin) = @_;
-  ### _X_rootwin_to_screen_number(): $rootwin
-  my $screens = $X->{'screens'};
-  foreach my $i (0 .. $#{$X->{'screens'}}) {
-    if ($screens->[$i]->{'root'} == $rootwin) {
-      return $i;
-    }
-  }
-  # not a root win
-  return undef;
 }
 
 1;
@@ -752,45 +726,46 @@ The screen number of the C<-drawable>, for example 0 for the first screen.
 =back
 
 The depth and screen of a drawable cannot be changed, and for the purposes
-of this interface the width and height are regarded as fixed too.  If you
-C<get> the C<-width>, C<-height>, C<-depth> or C<-screen> then for a root
-window the values are obtained from the C<X11::Protocol> object data, or for
-other drawables by a C<GetGeometry> to the server.  If you already know the
-values of some of these attributes then you can include them in the C<new>
-to record them ready for later C<get> and avoid that C<GetGeometry> query.
-Of course if nothing ever does such a C<get> then there's no need.
+of this interface the width and height are regarded as fixed too.
+
+If you C<get()> the C<-width>, C<-height>, C<-depth> or C<-screen> then for
+a root window the values are obtained from the C<X11::Protocol> object info,
+or for other drawables by a C<GetGeometry> to the server.  If you already
+know the values of some of these attributes then include them in the C<new>
+to record ready for later C<get()> and avoid that C<GetGeometry> query.  Of
+course if nothing ever does such a C<get()> then there's no need.
 
 =head1 ALGORITHMS
 
-C<ellipse> uses C<PolyArc> for a line centred on the boundary pixels, being
-the midpoints of the C<$y1> row, C<$y2> row, C<$x1> column, etc.  The way
-the "centre within the shape" rule works should mean that circles are
-symmetric, but the X protocol spec allows the server some implementation
+C<ellipse> uses a C<PolyArc> line centred on the boundary pixels, being the
+midpoints of the C<$y1> row, C<$y2> row, C<$x1> column, etc.  The way the
+pixel "centre within the shape" rule works should mean that circles are
+symmetric, but the X protocol spec gives the server some implementation
 dependent latitude for ellipses width!=height.
 
-A filled ellipse uses the X11 C<FillArc>, but its shape is the inside of the
-ellipse centred on the boundary pixels, which is effectively 1/2 a pixel in
-from the ellipse line edge, and in particular the "centre on the boundary
-drawn if above or left" rule means the bottom row and rightmost column
-aren't drawn at all.  The current strategy is to draw a C<PolyArc> on top
-for the extra 1/2 pixel radius.
+A filled ellipse uses the X11 C<FillArc>, but that means the inside of the
+ellipse centred on the boundary pixels, which is effectively a 1/2 pixel in
+from the ellipse line edge, and in particular the pixel "centre on the
+boundary drawn if above or left" rule means the bottom row and rightmost
+column aren't drawn at all.  The current strategy is to draw a C<PolyArc> on
+top for the extra 1/2 pixel radius.
 
 For a circle an alternative strategy would be to set the line width to half
-the radius and draw half again of that in from the edges so that the line
-extends from the centre of the box to the outer edges.  The way a line comes
-out as linewidth/2 each side makes a resolution of 1/2 pixel possible.  The
-disadvantage would be changing the GC each time, and which might be
-undesirable if it came from the user (an as-yet undocumented C<-gc>
-attribute).  Note also this is no good for an ellipse width!=height because
-if you draw a fixed distance out tangent to an ellipse the resulting shape
-is not a bigger ellipse, it's a bit fatter than an ellipse.
+the radius and draw from half way in from the edges so that the line extends
+from the centre of the box to the outer edges.  The way a line is
+linewidth/2 to each side makes a resolution of 1/2 pixel possible.  The
+disadvantage would be changing the GC each time, which might be undesirable
+if it came from the user (an as-yet undocumented C<-gc> attribute).  Note
+also this is no good for an ellipse width!=height because if you draw a
+fixed distance tangent to an ellipse the resulting shape is not a bigger
+ellipse, it's a bit fatter than an ellipse.
 
 The C<FillArc> plus C<PolyArc> combination ends up drawing some pixels
-twice, which is no good for an "xor" gc operation.  Currently that doesn't
+twice, which is no good for an "XOR" gc operation.  Currently that doesn't
 arise for C<Image::Base::X11::Protocol::Drawable>, but if there was a user
 supplied C<-gc> then more care might be wanted.  At worst the base
 C<Image::Base> code could be left to handle it all, or draw onto a temporary
-bitmap mask, or something like that.
+bitmap as a mask, or something like that.
 
 =head1 BUGS
 

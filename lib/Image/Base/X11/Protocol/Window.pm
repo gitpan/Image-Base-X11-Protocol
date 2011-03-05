@@ -25,7 +25,7 @@ use vars '@ISA', '$VERSION';
 use Image::Base::X11::Protocol::Drawable;
 @ISA = ('Image::Base::X11::Protocol::Drawable');
 
-$VERSION = 7;
+$VERSION = 8;
 
 # uncomment this to run the ### lines
 #use Smart::Comments;

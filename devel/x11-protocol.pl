@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# Copyright 2010 Kevin Ryde
+# Copyright 2010, 2011 Kevin Ryde
 
 # This file is part of Image-Base-X11-Protocol.
 #
@@ -31,22 +31,24 @@ use MyTestImageBase;
 
 
 {
-  $ENV{'DISPLAY'} = ':0';
+  $ENV{'DISPLAY'} ||= ':0';
   my $X = X11::Protocol->new;
-  ### $X
+  # ### $X
   my $rootwin = $X->{'root'};
-
-  my $w = 32768;
-  my $h = 20;
-  my $pixmap = $X->new_rsrc;
-  $X->CreatePixmap ($pixmap,
-                    $X->{'root'},
-                    1,  # depth
-                    $w, $h);
-
   $X->QueryPointer($rootwin);  # sync
+
+  my $image = Image::Base::X11::Protocol::Pixmap->new
+    (-X      => $X,
+     -width  => 2,
+     -height => 2,
+     -colormap => $X->{'default_colormap'},
+    );
+  $image->add_colours('#0000BA');
+  my @q = $X->QueryPointer($rootwin);  # sync
+  ### @q
   exit 0;
 }
+
 {
   # my $win = $X->new_rsrc;
   # my $image = Image::Base::X11::Protocol::Pixmap->new
@@ -61,6 +63,23 @@ use MyTestImageBase;
   # 
   # $image->rectangle (10,10,50,50, 'set');
   # say $image->xy (10,10);
+  exit 0;
+}
+{
+  $ENV{'DISPLAY'} = ':0';
+  my $X = X11::Protocol->new;
+  ### $X
+  my $rootwin = $X->{'root'};
+
+  my $w = 32768;
+  my $h = 20;
+  my $pixmap = $X->new_rsrc;
+  $X->CreatePixmap ($pixmap,
+                    $X->{'root'},
+                    1,  # depth
+                    $w, $h);
+
+  $X->QueryPointer($rootwin);  # sync
   exit 0;
 }
 

@@ -38,6 +38,8 @@ MyMakeMakerExtras::WriteMakefile
                     # 0.56 for robust_req() fix
                     'X11::Protocol' => '0.56',
 
+                    'X11::Protocol::Other' => 1,
+
                     # only for testing
                     'Test' => 0,
                    },

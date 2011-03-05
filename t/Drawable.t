@@ -26,23 +26,25 @@ use lib 't';
 use MyTestHelpers;
 BEGIN { MyTestHelpers::nowarnings() }
 
-my $test_count = 4623;
+my $test_count = 4622;
 plan tests => $test_count;
 
 my $display = $ENV{'DISPLAY'};
 if (! defined $display) {
+  MyTestHelpers::diag ('No DISPLAY set');
   foreach (1 .. $test_count) {
     skip ('No DISPLAY set', 1, 1);
   }
   exit 0;
 }
+MyTestHelpers::diag ("DISPLAY $display");
 
 # pass display arg so as not to get a "guess" warning
 my $X;
 if (! eval { $X = X11::Protocol->new ($display); }) {
-  my $why = "Cannot connect to X server -- $@";
+  MyTestHelpers::diag ("Cannot connect to X server -- $@");
   foreach (1 .. $test_count) {
-    skip ($why, 1, 1);
+    skip ("Cannot connect to X server", 1, 1);
   }
   exit 0;
 }
@@ -54,54 +56,15 @@ MyTestHelpers::diag ("Image::Base version ", Image::Base->VERSION);
 # uncomment this to run the ### lines
 #use Smart::Comments;
 
+MyTestHelpers::X11_server_info($X);
 # screen number integer 0, 1, etc
-sub X_chosen_screen_number {
-  my ($X) = @_;
-  foreach my $i (0 .. $#{$X->{'screens'}}) {
-    if ($X->{'screens'}->[$i]->{'root'} == $X->{'root'}) {
-      return $i;
-    }
-  }
-  die "Oops, current screen not found";
-}
-my $X_screen_number = X_chosen_screen_number($X);
-
-
-MyTestHelpers::diag "";
-MyTestHelpers::diag "X server info";
-MyTestHelpers::diag "vendor: ",$X->{'vendor'};
-MyTestHelpers::diag "release_number: ",$X->{'release_number'};
-MyTestHelpers::diag "protocol_major_version: ",$X->{'protocol_major_version'};
-MyTestHelpers::diag "protocol_minor_version: ",$X->{'protocol_minor_version'};
-MyTestHelpers::diag "byte_order: ",$X->{'byte_order'};
-MyTestHelpers::diag "num screens: ",scalar(@{$X->{'screens'}});
-MyTestHelpers::diag "width_in_pixels: ",$X->{'width_in_pixels'};
-MyTestHelpers::diag "height_in_pixels: ",$X->{'height_in_pixels'};
-MyTestHelpers::diag "width_in_millimeters: ",$X->{'width_in_millimeters'};
-MyTestHelpers::diag "height_in_millimeters: ",$X->{'height_in_millimeters'};
-MyTestHelpers::diag "root_visual: ",$X->{'root_visual'};
-{
-  my $visual = $X->{'visuals'}->{$X->{'root_visual'}};
-  MyTestHelpers::diag "  depth: ",$visual->{'depth'};
-  MyTestHelpers::diag "  class: ",$visual->{'class'},
-      ' ', $X->interp('VisualClass', $visual->{'class'});
-  MyTestHelpers::diag "  colormap_entries: ",$visual->{'colormap_entries'};
-  MyTestHelpers::diag "  bits_per_rgb_value: ",$visual->{'bits_per_rgb_value'};
-  MyTestHelpers::diag "  red_mask: ",sprintf('%#X',$visual->{'red_mask'});
-  MyTestHelpers::diag "  green_mask: ",sprintf('%#X',$visual->{'green_mask'});
-  MyTestHelpers::diag "  blue_mask: ",sprintf('%#X',$visual->{'blue_mask'});
-}
-MyTestHelpers::diag "image_byte_order: ",$X->{'image_byte_order'},
-  ' ', $X->interp('Significance', $X->{'image_byte_order'});
-MyTestHelpers::diag "black_pixel: ",sprintf('%#X',$X->{'black_pixel'});
-MyTestHelpers::diag "white_pixel: ",sprintf('%#X',$X->{'white_pixel'});
-MyTestHelpers::diag "";
+my $X_screen_number = MyTestHelpers::X11_chosen_screen_number($X);
 
 
 #------------------------------------------------------------------------------
 # VERSION
 
-my $want_version = 7;
+my $want_version = 8;
 ok ($Image::Base::X11::Protocol::Drawable::VERSION,
     $want_version, 'VERSION variable');
 ok (Image::Base::X11::Protocol::Drawable->VERSION,
@@ -114,26 +77,6 @@ my $check_version = $want_version + 1000;
 ok (! eval { Image::Base::X11::Protocol::Drawable->VERSION($check_version); 1 },
     1,
     "VERSION class check $check_version");
-
-#------------------------------------------------------------------------------
-# _X_rootwin_to_screen_number()
-
-{
-  ## no critic (ProtectPrivateSubs)
-  my $screens_aref = $X->{'screens'};
-  my $good = 1;
-  foreach my $screen_number (0 .. $#$screens_aref) {
-    my $rootwin = $screens_aref->[$screen_number]->{'root'}
-      || die "oops, no 'root' under screen $screen_number";
-    my $got = Image::Base::X11::Protocol::Drawable::_X_rootwin_to_screen_number($X,$rootwin);
-    if (! defined $got || $got != $screen_number) {
-      $good = 0;
-      MyTestHelpers::diag "_X_rootwin_to_screen_number() wrong on rootwin $rootwin screen $screen_number";
-      MyTestHelpers::diag "got ", (defined $got ? $got : 'undef');
-    }
-  }
-  ok ($good, 1, "_X_rootwin_to_screen_number()");
-}
 
 #------------------------------------------------------------------------------
 # root window info
@@ -344,9 +287,9 @@ sub step_seq_num {
   return $seq;
 }
 
-sub run_seq_to_FF00 {
+sub run_seq_to_FFA0 {
   my ($X) = @_;
-  my $target = 0xFF00;
+  my $target = 0xFFA0;
   my $limit = 100;
   my $count = 0;
   my $seq = step_seq_num($X);
@@ -355,7 +298,7 @@ sub run_seq_to_FF00 {
     my $diff = ($target - $seq) & 0xFFFF;
     ### $diff
     if ($diff < 10) {
-      MyTestHelpers::diag "run_seq_to_FF00() $count steps to seq $seq";
+      MyTestHelpers::diag "run_seq_to_FFA0() $count steps to seq $seq";
       last;
     }
     my @pending;
@@ -373,7 +316,7 @@ sub run_seq_to_FF00 {
       $X->delete_reply ($pending);
     }
     if (--$limit < 0) {
-      MyTestHelpers::diag "run_seq_to_FF00(): oops, cannot get seq to 0xFF00";
+      MyTestHelpers::diag "run_seq_to_FFA0(): oops, cannot get seq to 0xFFA0";
       die;
     }
   }
@@ -385,15 +328,22 @@ sub next_test_colour {
 }
 
 {
+  my $depth = $X->{'root_depth'};
+  my $colormap = $X->{'default_colormap'};
+  my $num_test_colours = int ((2 ** $depth) / 3);
+  if ($num_test_colours > 5000) {
+    $num_test_colours = 5000;
+  }
+
   my $pixmap = $X->new_rsrc;
   $X->CreatePixmap ($pixmap,
                     $X->{'root'},
-                    $X->{'root_depth'},
+                    $depth,
                     21, 10);
   my $image = Image::Base::X11::Protocol::Drawable->new
     (-X => $X,
      -drawable => $pixmap,
-     -colormap => $X->{'default_colormap'});
+     -colormap => $colormap);
 
   {
     MyTestHelpers::diag "add_colours() error received";
@@ -412,14 +362,14 @@ sub next_test_colour {
   }
 
   {
-    my @colours = map {next_test_colour()} 1 .. 5000;
+    my @colours = map {next_test_colour()} 1 .. $num_test_colours;
     MyTestHelpers::diag "add_colours() ",scalar(@colours);
     $image->add_colours(@colours);
   }
   {
-    my @colours = map {next_test_colour()} 1 .. 5000;
+    my @colours = map {next_test_colour()} 1 .. $num_test_colours;
     MyTestHelpers::diag "add_colours() ",scalar(@colours)," with seq wraparound";
-    run_seq_to_FF00($X);
+    run_seq_to_FFA0($X);
     $image->add_colours(@colours);
   }
 

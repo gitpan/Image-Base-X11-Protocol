@@ -17,6 +17,10 @@ You can get a copy of the GNU General Public License online at
 
 
 
+Version 8, March 2011
+    - use X11::Protocol::Other
+    - fix for unknown colour handling
+
 Version 7, February 2011
     - tests allow for window becoming obscured during testing
 
@@ -25,11 +29,11 @@ Version 6, February 2011
     - hex white lower case #ffffff and #ffffffffffff too
 
 Version 5, December 2010
-    - add_colours() fix dispatch to prev error handler, use a sliding
+    - add_colours() fix dispatch to prev error handler, and use a sliding
       window instead of batches
 
 Version 4, November 2010
-    - xy() fetching mask GetImage possible garbage in extra bits/bytes
+    - xy() fetching mask out GetImage possible garbage in extra bits/bytes
 
 Version 3, November 2010
     - ellipse() new $fill parameter

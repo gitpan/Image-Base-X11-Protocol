@@ -20,12 +20,13 @@ package Image::Base::X11::Protocol::Pixmap;
 use 5.004;
 use strict;
 use Carp;
+use X11::Protocol::Other;
 use vars '@ISA', '$VERSION';
 
 use Image::Base::X11::Protocol::Drawable;
 @ISA = ('Image::Base::X11::Protocol::Drawable');
 
-$VERSION = 7;
+$VERSION = 8;
 
 # uncomment this to run the ### lines
 #use Smart::Comments;
@@ -49,7 +50,7 @@ sub new {
 
     my $depth = $params{'-depth'};
     if (! defined $depth) {
-      if (my $screen_info = _X_rootwin_to_screen_info($X, $for_drawable)) {
+      if (my $screen_info = X11::Protocol::Other::root_to_screen_info($X, $for_drawable)) {
         $depth = $screen_info->{'root_depth'};
       } else {
         my %geom = $X->GetGeometry($for_drawable);
@@ -84,17 +85,6 @@ sub new {
                       $params{'-height'});
   }
   return $class->SUPER::new (%params);
-}
-
-# note: no List::Util for 5.004
-sub _X_rootwin_to_screen_info {
-  my ($X, $rootwin) = @_;
-  foreach my $screen_info (@{$X->{'screens'}}) {
-    if ($screen_info->{'root'} eq $rootwin) {
-      return $screen_info;
-    }
-  }
-  return undef;
 }
 
 sub _get {
