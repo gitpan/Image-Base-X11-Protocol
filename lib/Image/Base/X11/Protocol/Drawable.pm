@@ -21,13 +21,13 @@ use 5.004;
 use strict;
 use Carp;
 use X11::Protocol 0.56; # version 0.56 for robust_req() fix
-use X11::Protocol::Other;
+use X11::Protocol::Other 3;  # v.3 for hexstr_to_rgb()
 use vars '@ISA', '$VERSION';
 
 use Image::Base;
 @ISA = ('Image::Base');
 
-$VERSION = 8;
+$VERSION = 9;
 
 # uncomment this to run the ### lines
 #use Smart::Comments;
@@ -246,7 +246,7 @@ sub Image_Base_Other_xy_points {
   my $gc = _gc_colour($self,$colour);
   my $X = $self->{'-X'};
 
-  # PolyPoint is 3xCARD32 header,drawable,gc then room for maxlen-3 words of
+  # PolyPoint is 3xCARD32 drawable,gc,mode then room for maxlen-3 words of
   # X,Y values.  X and Y are INT16 each, hence room for (maxlen-3)*2
   # individual points.  Is there any value sending somewhat smaller chunks
   # though?  250kbytes is a typical server limit.
@@ -529,9 +529,7 @@ sub add_colours {
     my $elem = { colour => $colour };
     my @req;
     # Crib: [:xdigit:] new in 5.6, so only 0-9A-F
-    if (my @rgb = ($colour =~ /^#([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})$/i)) {
-      @req = ('AllocColor', $colormap, map {hex() * 0x101} @rgb);
-    } elsif (@rgb = ($colour =~ /^#([0-9A-F]{4})([0-9A-F]{4})([0-9A-F]{4})$/i)) {
+    if (my @rgb = X11::Protocol::Other::hexstr_to_rgb($colour)) {
       @req = ('AllocColor', $colormap, map {hex} @rgb);
     } else {
       @req = ('AllocNamedColor', $colormap, $colour);
@@ -597,10 +595,11 @@ The subclasses C<Image::Base::X11::Protocol::Pixmap> and
 C<Image::Base::X11::Protocol::Window> have things specific to a pixmap or
 window respectively.  Drawable is the common parts.
 
-Colour names are anything known to the X server (usually from the file
-F</etc/X11/rgb.txt>), or 2-digit or 4-digit hex #RRGGBB and #RRRRGGGGBBBB.
-Colours used are allocated in a specified C<-colormap>.  For bitmaps pixel
-values 1 and 0 can be used directly, plus special names "set" and "clear".
+Colour names are anything known to the X server (usually per its
+F</etc/X11/rgb.txt> file), or 1 to 4 digit hex "#RGB", "#RRGGBB",
+"#RRRGGGBBB" or "#RRRRGGGGBBBB".  Colours used are allocated in a specified
+C<-colormap>.  For bitmaps pixel values 1 and 0 can be used directly, plus
+special names "set" and "clear".
 
 Native X drawing does much more than C<Image::Base> but if you have some
 generic pixel twiddling code for C<Image::Base> then this Drawable class

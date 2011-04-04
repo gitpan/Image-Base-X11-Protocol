@@ -17,6 +17,9 @@ You can get a copy of the GNU General Public License online at
 
 
 
+Version 9, March 2011
+    - 1 and 3 digit hex colours too
+
 Version 8, March 2011
     - use X11::Protocol::Other
     - fix for unknown colour handling

@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# Copyright 2010 Kevin Ryde
+# Copyright 2010, 2011 Kevin Ryde
 
 # This file is part of Image-Base-X11-Protocol.
 #
@@ -38,6 +38,7 @@ use Smart::Comments;
   my $depth = $geom{'depth'};
   my $width = $geom{'width'};
   my $height = $geom{'height'};
+  my $border_width = $geom{'border_width'};
   $width = 200;
   $height = 200;
 
@@ -80,7 +81,7 @@ use Smart::Comments;
                 $height,
                 0, # window x
                 0, # window y
-                0, # border width
+                $border_width,
                );
 
   $header[0] = scalar(@header)*4 + length($window_name);

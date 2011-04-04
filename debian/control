@@ -26,7 +26,7 @@ Bugs: mailto:user42@zip.com.au
 
 Package: libimage-base-x11-protocol-perl
 Architecture: all
-Depends: perl (>= 5.004), libimage-base-perl | libimage-base-bundle-perl, libx11-protocol-perl (>= 0.56), libx11-protocol-other-perl (>= 1), ${perl:Depends}, ${misc:Depends}
-Description: Draw into X windows or pixmaps in Image::Base style.
- This extends Image::Base extension to draw into X server windows or
- pixmaps using X11::Protocol.
+Depends: perl (>= 5.004), libimage-base-perl | libimage-base-bundle-perl, libx11-protocol-perl (>= 0.56), libx11-protocol-other-perl (>= 3), ${perl:Depends}, ${misc:Depends}
+Description: Draw into X windows or pixmaps in Image::Base style
+ This extends Image::Base to draw into X server windows or pixmaps
+ using X11::Protocol.
