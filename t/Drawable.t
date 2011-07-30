@@ -26,7 +26,7 @@ use lib 't';
 use MyTestHelpers;
 BEGIN { MyTestHelpers::nowarnings() }
 
-my $test_count = 4622;
+my $test_count = 6056;
 plan tests => $test_count;
 
 my $display = $ENV{'DISPLAY'};
@@ -64,7 +64,7 @@ my $X_screen_number = MyTestHelpers::X11_chosen_screen_number($X);
 #------------------------------------------------------------------------------
 # VERSION
 
-my $want_version = 9;
+my $want_version = 10;
 ok ($Image::Base::X11::Protocol::Drawable::VERSION,
     $want_version, 'VERSION variable');
 ok (Image::Base::X11::Protocol::Drawable->VERSION,
@@ -148,6 +148,27 @@ ok (! eval { Image::Base::X11::Protocol::Drawable->VERSION($check_version); 1 },
   local $MyTestImageBase::white = 1;
   local $MyTestImageBase::black = 0;
   MyTestImageBase::check_image ($image);
+
+  $X->FreePixmap ($bitmap);
+  $X->QueryPointer($X->{'root'});  # sync
+}
+
+{
+  my $rootwin = $X->{'root'};
+
+  my $bitmap = $X->new_rsrc;
+  $X->CreatePixmap ($bitmap,
+                    $rootwin,
+                    1,  # depth
+                    21, 10);
+
+  my $image = Image::Base::X11::Protocol::Drawable->new
+    (-X => $X,
+     -drawable => $bitmap);
+
+  my $colour = $image->xy(0,0);
+  ok ($image->{'-depth'},    1, 'xy() sets -depth');
+  ok ($image->get('-depth'), 1, 'bitmap get() -depth');
 
   $X->FreePixmap ($bitmap);
   $X->QueryPointer($X->{'root'});  # sync
@@ -267,6 +288,7 @@ ok (! eval { Image::Base::X11::Protocol::Drawable->VERSION($check_version); 1 },
   require MyTestImageBase;
   local $MyTestImageBase::white = 'white';
   local $MyTestImageBase::black = 'black';
+  MyTestImageBase::check_diamond ($image);
   MyTestImageBase::check_image ($image);
 
   $X->FreePixmap ($pixmap);
@@ -346,7 +368,7 @@ sub next_test_colour {
      -colormap => $colormap);
 
   {
-    MyTestHelpers::diag "add_colours() error received";
+    MyTestHelpers::diag "add_colours() check for error received";
     my $error_seen = 0;
     local $X->{'error_handler'} = sub {
       $error_seen = 1;

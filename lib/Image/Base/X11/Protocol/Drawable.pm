@@ -16,6 +16,9 @@
 # with Image-Base-X11-Protocol.  If not, see <http://www.gnu.org/licenses/>.
 
 
+# /usr/share/doc/x11proto-core-dev/x11protocol.txt.gz
+#
+
 package Image::Base::X11::Protocol::Drawable;
 use 5.004;
 use strict;
@@ -27,10 +30,10 @@ use vars '@ISA', '$VERSION';
 use Image::Base;
 @ISA = ('Image::Base');
 
-$VERSION = 9;
+$VERSION = 10;
 
 # uncomment this to run the ### lines
-#use Smart::Comments;
+#use Devel::Comments '###';
 
 sub new {
   my $class = shift;
@@ -195,13 +198,16 @@ sub xy {
   my $X = $self->{'-X'};
   my $drawable = $self->{'-drawable'};
   if (@_ == 4) {
-    $X->PolyPoint ($drawable, _gc_colour($self,$colour),
-                   'Origin', $x,$y);
+    if ($x >= 0 && $y >= 0
+        && $x <= 32767 && $y <= 32767) {  # don't overflow INT16 request
+      $X->PolyPoint ($drawable, _gc_colour($self,$colour),
+                     'Origin', $x,$y);
+    }
     return;
   }
 
-  my @reply = $X->robust_req('GetImage', $drawable,
-                             $x, $y, 1, 1, ~0, 'ZPixmap');
+  my @reply = $X->robust_req ('GetImage', $drawable,
+                              $x, $y, 1, 1, 0xFFFFFFFF, 'ZPixmap');
   if (! ref $reply[0]) {
     if ($reply[0] eq 'Match') {
       ### Match error reading offscreen
@@ -210,25 +216,27 @@ sub xy {
     croak "Error reading pixel: ",join(' ',@reply);
   }
   my ($depth, $visual, $bytes) = @{$reply[0]};
+  if (! defined $self->{'-depth'}) {
+    $self->{'-depth'} = $depth;
+  }
+  ### $depth
+  ### $visual
 
   # X11::Protocol 0.56 shows named 'LeastSiginificant' in the pod, but the
-  # code gives raw number '0'
-  if ($X->{'image_byte_order'} eq 'LeastSiginificant'
-      || $X->{'image_byte_order'} eq '0') {
+  # code gives raw number '0'.  Let num() crunch either.
+  if ($X->num('Significance',$X->{'image_byte_order'}) == 0) {
     #### reverse for LSB image format
     $bytes = reverse $bytes;
   }
-  #### $depth
-  #### $visual
-  #### $bytes
+  ### $bytes
   my $pixel = unpack ('N', $bytes);
 
   # not sure what the protocol says about extra bits or bytes in the reply
   # data, have seen a freebsd server giving garbage, so mask the extras
   $pixel &= (1 << $depth) - 1;
 
-  #### pixel: sprintf '%X', $pixel
-  #### pixel_to_colour: $self->pixel_to_colour($pixel)
+  ### pixel: sprintf '%X', $pixel
+  ### pixel_to_colour: $self->pixel_to_colour($pixel)
   if (defined ($colour = $self->pixel_to_colour($pixel))) {
     return $colour;
   }
@@ -282,19 +290,26 @@ sub line {
 sub rectangle {
   my ($self, $x1, $y1, $x2, $y2, $colour, $fill) = @_;
   ### X11-Protocol-Drawable rectangle
-  if ($x1 == $x2 || $y1 == $y2) {
-    # single pixel wide or high, must treat as filled as PolyRectangle draws
-    # nothing if it's passed width==0 or height==0
-    $fill = 1;
-  } else {
-    $fill = !!$fill;  # 0 or 1
-  }
-  ### coords: [ $x1, $y1, $x2-$x1, $y2-$y1 ]
+  if ($x2 >= 0 && $y2 >= 0 && $x1 <= 32767 && $y1 <= 32767) {
+    if ($x1 < 0) { $x1 = 0; } # don't underflow INT16 -32768 in request
+    if ($y1 < 0) { $y1 = 0; }
+    if ($x2 > 32767) { $x2 = 32767; } # don't overflow INT16 request
+    if ($y2 > 32767) { $y2 = 32767; }
 
-  $self->{'-X'}->request (($fill ? 'PolyFillRectangle' : 'PolyRectangle'),
-                          $self->{'-drawable'},
-                          _gc_colour($self,$colour),
-                          [ $x1, $y1, $x2-$x1+$fill, $y2-$y1+$fill ]);
+    if ($x1 == $x2 || $y1 == $y2) {
+      # single pixel wide or high, must PolyFillRectangle treat as filled
+      # since PolyRectangle draws nothing if passed width==0 or height==0
+      $fill = 1;
+    } else {
+      $fill = !!$fill;  # 0 or 1 for addition below
+    }
+    ### coords: [ $x1, $y1, $x2-$x1, $y2-$y1 ]
+
+    $self->{'-X'}->request (($fill ? 'PolyFillRectangle' : 'PolyRectangle'),
+                            $self->{'-drawable'},
+                            _gc_colour($self,$colour),
+                            [ $x1, $y1, $x2-$x1+$fill, $y2-$y1+$fill ]);
+  }
 }
 
 sub Image_Base_Other_rectangles {
@@ -384,7 +399,7 @@ sub Image_Base_Other_rectangles {
 # same in Window.pm for shape stuff
 sub ellipse {
   my ($self, $x1, $y1, $x2, $y2, $colour, $fill) = @_;
-  ### Drawable ellipse: $x1, $y1, $x2, $y2, $colour
+  ### Drawable ellipse(): $x1, $y1, $x2, $y2, $colour
   if (abs($x1-$x2) <= 1 || abs($y1-$y2) < 1) {
     # 1 or 2 pixels wide or high
     shift->rectangle(@_);
@@ -400,6 +415,56 @@ sub ellipse {
     }
     $X->PolyArc (@args);
   }
+}
+
+sub diamond {
+  my ($self, $x1, $y1, $x2, $y2, $colour, $fill) = @_;
+  ### Drawable diamond(): $x1, $y1, $x2, $y2, $colour
+
+  my $X = $self->{'-X'};
+  my $drawable = $self->{'-drawable'};
+  my $gc = _gc_colour($self,$colour);
+
+  if ($x1==$x2 && $y1==$y2) {
+    # 1x1 polygon draws nothing, do it as a point instead
+    $X->PolyPoint ($drawable, $gc, 'Origin', $x1,$y1);
+
+  } else {
+    _diamond_drawable ($X, $drawable, $gc, $x1,$y1, $x2,$y2, $fill);
+  }
+}
+
+# shared by Image::Base::X11::Protocol::Window::diamond()
+sub _diamond_drawable {
+  my ($X, $drawable, $gc, $x1, $y1, $x2, $y2, $fill) = @_;
+  my $xh = ($x2 - $x1 + 1);
+  my $yh = ($y2 - $y1 + 1);
+  my $xeven = ! ($xh & 1);
+  my $yeven = ! ($yh & 1);
+  $xh = int($xh / 2);
+  $yh = int($yh / 2);
+  my @args =('Origin',
+
+             $x1+$xh, $y1,  # top centre
+
+             # left
+             $x1, $y1+$yh,
+             ($yeven ? ($x1, $y2-$yh) : ()),
+
+             # bottom
+             $x1+$xh, $y2,
+             ($xeven ? ($x2-$xh, $y2) : ()),
+
+             # right
+             ($yeven ? ($x2, $y2-$yh) : ()),
+             $x2, $y1+$yh,
+
+             ($xeven ? ($x2-$xh, $y1) : ()),
+             $x1+$xh, $y1);  # back to start
+  if ($fill) {
+    $X->FillPoly ($drawable, $gc, 'Convex', @args);
+  }
+  $X->PolyLine ($drawable, $gc, @args);
 }
 
 # return a gc XID set to draw in $colour
@@ -528,7 +593,9 @@ sub add_colours {
 
     my $elem = { colour => $colour };
     my @req;
-    # Crib: [:xdigit:] new in 5.6, so only 0-9A-F
+    # Crib: [:xdigit:] new in 5.6, so only 0-9A-F, and in any case as of
+    # perl 5.12.4 [:xdigit:] matches some wide chars but hex() doesn't
+    # accept them
     if (my @rgb = X11::Protocol::Other::hexstr_to_rgb($colour)) {
       @req = ('AllocColor', $colormap, map {hex} @rgb);
     } else {
@@ -593,20 +660,31 @@ C<X11::Protocol>.  There's no file load or save, just drawing operations.
 
 The subclasses C<Image::Base::X11::Protocol::Pixmap> and
 C<Image::Base::X11::Protocol::Window> have things specific to a pixmap or
-window respectively.  Drawable is the common parts.
-
-Colour names are anything known to the X server (usually per its
-F</etc/X11/rgb.txt> file), or 1 to 4 digit hex "#RGB", "#RRGGBB",
-"#RRRGGGBBB" or "#RRRRGGGGBBBB".  Colours used are allocated in a specified
-C<-colormap>.  For bitmaps pixel values 1 and 0 can be used directly, plus
-special names "set" and "clear".
+window.  Drawable is the common parts.
 
 Native X drawing does much more than C<Image::Base> but if you have some
-generic pixel twiddling code for C<Image::Base> then this Drawable class
-lets you point it at an X window etc.  Drawing directly into a window is a
+generic pixel twiddling code for C<Image::Base> then this module lets you
+point it at an X window, pixmap, etc.  Drawing directly into a window is a
 good way to show slow drawing progressing, rather than drawing a pixmap or
 image file and only displaying when complete.  Or see
 C<Image::Base::Multiplex> for a way to do both simultaneously.
+
+=head2 Colour Names
+
+Colour names are the server's colour names per C<AllocNamedColor> plus
+hexadecimal RGB, and set/clear for bitmaps or monochrome windows,
+
+    AllocNamedColor    usually server's /etc/X11/rgb.txt    
+    #RGB               1 to 4 digit hex
+    #RRGGBB
+    #RRRGGGBBB
+    #RRRRGGGGBBBB
+    1                  \              
+    0                   |  for bitmaps and monochrome windows
+    set                 |
+    clear              /
+
+Colours used are allocated in a specified C<-colormap>.
 
 =head1 FUNCTIONS
 
@@ -622,8 +700,8 @@ connection object and a drawable XID (an integer).
                    -drawable => $drawable_xid,
                    -colormap => $X->{'default_colormap'});
 
-A colormap should be given if allocating colours (anything except a bitmap
-normally).
+A colormap should be given if allocating colours, which means generally
+means anything except a bitmap or monochrome window.
 
 =cut
 
@@ -639,16 +717,18 @@ one go, so some function for that could be made if needed.
 
 In the current code the colour returned is either the name used to draw it,
 or 4-digit hex #RRRRGGGGBBBB queried from the C<-colormap>, or otherwise a
-raw pixel value.  If two colour names became the same pixel value because
-that was as close as could be represented then fetching might give either
-name.  The hex return is 4 digit components because that's the range in the
-X protocol.
+raw pixel value.  If two colour names are the same pixel value because that
+was as close as could be represented then fetching might give either name.
+The hex return is 4 digit components because that's the range in the X
+protocol.
 
 If the drawable is a window then parts overlapped by another window
-(including a sub-window) generally read back as an unspecified value.  Parts
-of a window which are off-screen have no data at all and the return is
-currently an empty string C<"">.  (Would C<undef> or the window background
-pixel be better?)
+(including a sub-window) generally read back as an random colour.  Parts of
+a window which are off-screen have no data at all and the return is
+currently an empty string C<"">.  Would C<undef> or the window background
+pixel be better?  (An off-screen C<GetImage> is actually a Match error
+reply, but that's turned into a plain return here since that will be much
+more helpful than the C<$X> connection error handler.)
 
 =item C<$image-E<gt>add_colours ($name, $name, ...)>
 
@@ -696,16 +776,18 @@ The colormap in which to allocate colours when drawing.
 
 Setting C<-colormap> only affects where colours are allocated.  If the
 drawable is a window then the colormap is not set into the window's
-attributes.
+attributes (that's left to an application if/when required).
 
 =item C<-width> (integer, read-only)
 
 =item C<-height> (integer, read-only)
 
-Width and height are read-only.  C<get> queries the server with
-C<GetGeometry> when required and then caches.  If you already know the size
-then including values in the C<new> will record them ready for later C<get>.
-The plain drawing operations don't need the size though.
+Width and height are read-only.  The minimum is 1 pixel, the maximum in the
+protocol is 32767 (a signed 16-bit value).
+
+Fetching with C<get()> queries the server with C<GetGeometry> and then
+caches.  If you already know the size then including values in the C<new()>
+will record them ready for later C<get()>.  
 
     $image = Image::Base::X11::Protocol::Drawable->new
                  (-X        => $x11_protocol_obj,
@@ -725,55 +807,62 @@ The screen number of the C<-drawable>, for example 0 for the first screen.
 =back
 
 The depth and screen of a drawable cannot be changed, and for the purposes
-of this interface the width and height are regarded as fixed too.
+of this interface the width and height are regarded as fixed too.  (Is that
+a good idea?)
 
-If you C<get()> the C<-width>, C<-height>, C<-depth> or C<-screen> then for
-a root window the values are obtained from the C<X11::Protocol> object info,
-or for other drawables by a C<GetGeometry> to the server.  If you already
-know the values of some of these attributes then include them in the C<new>
-to record ready for later C<get()> and avoid that C<GetGeometry> query.  Of
-course if nothing ever does such a C<get()> then there's no need.
+C<get()> of C<-width>, C<-height>, C<-depth> or C<-screen> for a root window
+uses values from the C<X11::Protocol> object info without querying the
+server.  For other drawables a C<GetGeometry> request is made.  If you
+already know the values of some of these attributes then include them in the
+C<new()> to record ready for later C<get()> and avoid that C<GetGeometry>
+query.  Of course if nothing ever does such a C<get()> then there's no need.
+The plain drawing operations don't need the size.
 
 =head1 ALGORITHMS
 
-C<ellipse> uses a C<PolyArc> line centred on the boundary pixels, being the
-midpoints of the C<$y1> row, C<$y2> row, C<$x1> column, etc.  The way the
-pixel "centre within the shape" rule works should mean that circles are
-symmetric, but the X protocol spec gives the server some implementation
-dependent latitude for ellipses width!=height.
+C<ellipse()> unfilled uses the X C<PolyArc> line centred on the boundary pixels,
+being the midpoints of the C<$y1> row, C<$y2> row, C<$x1> column, etc.  The
+way the pixel "centre within the shape" rule works should mean that circles
+are symmetric, but the X protocol spec allows the server some implementation
+dependent latitude for ellipses with width!=height.
 
-A filled ellipse uses the X11 C<FillArc>, but that means the inside of the
-ellipse centred on the boundary pixels, which is effectively a 1/2 pixel in
-from the ellipse line edge, and in particular the pixel "centre on the
-boundary drawn if above or left" rule means the bottom row and rightmost
-column aren't drawn at all.  The current strategy is to draw a C<PolyArc> on
-top for the extra 1/2 pixel radius.
+C<ellipse()> uses the X C<FillArc>, but that means the area inside an
+ellipse centred on the boundary pixels, which is effectively 1/2 pixel in
+from the ellipse line edge.  The pixel "centre on the boundary drawn if
+above or left" rule also means the bottom row and rightmost column aren't
+drawn at all.  The current strategy is to draw a C<PolyArc> on top for the
+extra 1/2 pixel radius.
 
 For a circle an alternative strategy would be to set the line width to half
-the radius and draw from half way in from the edges so that the line extends
-from the centre of the box to the outer edges.  The way a line is
-linewidth/2 to each side makes a resolution of 1/2 pixel possible.  The
+the radius and draw from half way in from the edges.  That means the line
+width is from the centre of the box to the outer edges.  The way a line has
+linewidth/2 each side makes a resolution of 1/2 pixel possible.  The
 disadvantage would be changing the GC each time, which might be undesirable
-if it came from the user (an as-yet undocumented C<-gc> attribute).  Note
-also this is no good for an ellipse width!=height because if you draw a
-fixed distance tangent to an ellipse the resulting shape is not a bigger
-ellipse, it's a bit fatter than an ellipse.
+if it came from the user (secret as-yet undocumented C<-gc> attribute).
+Note also this is no good for an ellipse width!=height because if you draw a
+fixed distance tangent to an ellipse then it's not a bigger ellipse, but a
+shape a fatter than an ellipse.
 
 The C<FillArc> plus C<PolyArc> combination ends up drawing some pixels
 twice, which is no good for an "XOR" gc operation.  Currently that doesn't
-arise for C<Image::Base::X11::Protocol::Drawable>, but if there was a user
+affect C<Image::Base::X11::Protocol::Drawable>, but if there was a user
 supplied C<-gc> then more care might be wanted.  At worst the base
 C<Image::Base> code could be left to handle it all, or draw onto a temporary
-bitmap as a mask, or something like that.
+bitmap to make a mask of desired pixels, or something like that.
+
+C<diamond()> uses C<PolyLine> and C<FillPoly> in similar ways to the ellipse
+above.  The C<FillPoly> has the same 1/2 pixel inside as the C<FillArc> and
+so a filled diamond is a C<PolyLine> on top of a C<FillPoly>.
 
 =head1 BUGS
 
-The pixel values for each colour used in drawing are cached for later
-re-use.  This is important to avoid a server round-trip on every drawing
-operation, but if you use a lot of different shades then the cache may
-become big.  Perhaps some sort of least recently used discard could keep a
-lid on it.  The intention is probably to have a colour-to-pixel hash or some
-such attribute which could be both initialized or manipulated as required.
+The pixel values for each colour used for drawing are cached for later
+re-use.  This is highly desirable to avoid a server round-trip on every
+drawing operation, but if you use a lot of different shades then the cache
+may become big.  Perhaps some sort of least recently used discard could keep
+a lid on it.  Perhaps the colour-to-pixel hash or some such attribute could
+be exposed so it could be both initialized, manipulated, or set to some tied
+LRU hash etc as desired.
 
 =head1 SEE ALSO
 

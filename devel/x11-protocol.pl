@@ -31,6 +31,63 @@ use MyTestImageBase;
 
 
 {
+  $ENV{'DISPLAY'} = ':0';
+  my $X = X11::Protocol->new;
+  $X->init_extension('SHAPE');
+  { local $,=' ', say keys %{$X->{'ext'}}; }
+
+  my $win = $X->new_rsrc;
+  $X->CreateWindow($win, $X->root,
+                   'InputOutput',
+                   $X->root_depth,
+                   'CopyFromParent',
+                   0,0,
+                   100,100,
+                   10,   # border
+                   background_pixel => $X->{'white_pixel'},
+                   override_redirect => 1,
+                   colormap => 'CopyFromParent',
+                  );
+  $X->MapWindow ($win);
+  ### attrs: $X->GetWindowAttributes ($win)
+  # $X->ClearArea ($win, 0,0,0,0);
+
+  my $image = Image::Base::X11::Protocol::Window->new
+    (-X => $X,
+     -window => $win);
+  $image->rectangle (0,0, 99,99, 'light grey', 1);
+
+  # $image->ellipse (10,10,50,50, 'black');
+  # $image->rectangle (10,10,50,50, 'black');
+
+  # $image->rectangle (2,2, 50,2, 'None', 0);
+  # $image->rectangle (2,2, 50,50, 'None', 0);
+   $image->rectangle (0,0,99,50, 'None', 1);
+
+  # $image->ellipse (2,2, 50,50, 'None', 1);
+
+#  $image->diamond (2,2, 50,52, 'None', 0);
+
+  {
+    my ($ordering, @rects) = $X->ShapeGetRectangles ($win, 'Bounding');
+    ### $ordering
+    ### @rects
+    my $contains = Image::Base::X11::Protocol::Window::_rects_contain_xy(0,0, @rects);
+    ### $contains
+  }
+
+  #   foreach my $i (0 .. 10) {
+  #      $image->ellipse (0+$i,0+$i, 50-1*$i,50-1*$i, 'None', 1);
+  #     # $image->line (0+$i,0, 50-$i,50, 'None', 1);
+  #   }
+
+  $X->flush;
+  $X->handle_input;
+  sleep 10;
+  exit 0;
+}
+
+{
   $ENV{'DISPLAY'} ||= ':0';
   my $X = X11::Protocol->new;
   # ### $X
@@ -43,9 +100,17 @@ use MyTestImageBase;
      -height => 2,
      -colormap => $X->{'default_colormap'},
     );
+   $image = Image::Base::X11::Protocol::Window->new
+    (-X      => $X,
+     -window => $X->root,
+    );
   $image->add_colours('#0000BA');
+  $image->xy(0,0,'green');
   my @q = $X->QueryPointer($rootwin);  # sync
   ### @q
+  x_resource_dump($X);
+  undef $image;
+  x_resource_dump($X);
   exit 0;
 }
 
@@ -83,52 +148,7 @@ use MyTestImageBase;
   exit 0;
 }
 
-{
-  $ENV{'DISPLAY'} = ':0';
-  my $X = X11::Protocol->new;
-  $X->init_extension('SHAPE');
-  { local $,=' ', say keys %{$X->{'ext'}}; }
 
-  my $win = $X->new_rsrc;
-  $X->CreateWindow($win, $X->root,
-                   'InputOutput',
-                   $X->root_depth,
-                   'CopyFromParent',
-                   0,0,
-                   100,100,
-                   10,   # border
-                   background_pixel => $X->{'white_pixel'},
-                   override_redirect => 1,
-                   colormap => 'CopyFromParent',
-                  );
-  $X->MapWindow ($win);
-  ### attrs: $X->GetWindowAttributes ($win)
-  # $X->ClearArea ($win, 0,0,0,0);
-
-  my $image = Image::Base::X11::Protocol::Window->new
-    (-X => $X,
-     -window => $win);
-  $image->rectangle (0,0, 99,99, 'light grey', 1);
-
-  # $image->ellipse (10,10,50,50, 'black');
-  # $image->rectangle (10,10,50,50, 'black');
-
-  $image->rectangle (2,2, 50,2, 'None', 0);
-  # $image->rectangle (2,2, 50,50, 'None', 0);
-  # $image->rectangle (3,3, 49,49, 'None', 0);
-
-  # $image->ellipse (2,2, 50,50, 'None', 1);
-
-  #   foreach my $i (0 .. 10) {
-  #      $image->ellipse (0+$i,0+$i, 50-1*$i,50-1*$i, 'None', 1);
-  #     # $image->line (0+$i,0, 50-$i,50, 'None', 1);
-  #   }
-
-  $X->flush;
-  $X->handle_input;
-  sleep 10;
-  exit 0;
-}
 
 {
   # zero width lines 0,0 to 0,0 draw pixel if bitmap but don't if not bitmap
@@ -374,3 +394,33 @@ use MyTestImageBase;
 
 
 
+sub x_resource_dump {
+  my ($X) = @_;
+  $X->init_extension ('X-Resource');
+  my $xid_base = $X->resource_id_base;
+
+  printf "client 0x%X is using\n", $xid_base;
+
+  my $ret = $X->robust_req('XResourceQueryClientResources', $xid_base);
+  if (ref $ret) {
+    my @resources = @$ret;
+    while (@resources) {
+      my $atom = shift @resources;
+      my $count = shift @resources;
+      my $atom_name = $X->atom_name($atom);
+      printf "%6d  %s\n", $count, $atom_name;
+    }
+  } else {
+    print "  error getting client resources\n";
+  }
+
+  $ret = $X->robust_req ('XResourceQueryClientPixmapBytes', $xid_base);
+  if (ref $ret) {
+    my ($bytes) = @$ret;
+    printf "%6s  PixmapBytes\n", $bytes;
+  } else {
+    print "  error getting pixmap bytes\n";
+  }
+
+  print "\n";
+}

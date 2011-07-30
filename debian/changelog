@@ -1,5 +1,5 @@
-libimage-base-x11-protocol-perl (9-1) unstable; urgency=low
+libimage-base-x11-protocol-perl (10-1) unstable; urgency=low
 
   * Packaged version.
 
- -- Kevin Ryde <user42@zip.com.au>  Tue, 05 Apr 2011 09:22:34 +1000
+ -- Kevin Ryde <user42@zip.com.au>  Sat, 30 Jul 2011 11:07:42 +1000

@@ -20,7 +20,7 @@ Section: perl
 Priority: optional
 Build-Depends: libtest-perl | perl (>= 5.004.05), cdbs, debhelper (>= 5)
 Maintainer: Kevin Ryde <user42@zip.com.au>
-Standards-Version: 3.9.1
+Standards-Version: 3.9.2
 Homepage: http://user42.tuxfamily.org/image-base-x11-protocol/index.html
 Bugs: mailto:user42@zip.com.au
 

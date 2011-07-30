@@ -33,6 +33,8 @@ MyMakeMakerExtras::WriteMakefile
    PREREQ_PM    => {
                     # ellipse() $fill done natively, so no need to depend on
                     # Image::Base 1.12 for that
+                    # diamond() done entirely natively, so no need to depend on
+                    # Image::Base 1.16 for that
                     'Image::Base' => 0,
 
                     # 0.56 for robust_req() fix

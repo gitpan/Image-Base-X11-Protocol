@@ -26,7 +26,7 @@ use strict;
 use Test;
 my $test_count;
 BEGIN {
-  $test_count = 2313;
+  $test_count = 6526;
   plan tests => $test_count;
 }
 
@@ -37,6 +37,9 @@ use MyTestImageBase;
 
 use X11::Protocol;
 use Image::Base::X11::Protocol::Window;
+
+# uncomment this to run the ### lines
+#use Devel::Comments;
 
 my $X;
 my $display = $ENV{'DISPLAY'};
@@ -56,8 +59,8 @@ if (! eval { $X = X11::Protocol->new ($display); }) {
   exit 0;
 }
 
-my $width = 100;
-my $height = 100;
+my $width = 21;
+my $height = 10;
 my $border = 5;
 
 my $under_win = $X->new_rsrc;
@@ -115,7 +118,7 @@ $X->CreateWindow($win, $under_win,
                  0,0,
                  $width,$height,
                  $border,
-                 background_pixel => 0x123456,
+                 background_pixel => $X->{'black_pixel'},
                  border_pixel => $X->{'white_pixel'},
                  override_redirect => 1,
                  colormap => 'CopyFromParent',
@@ -129,23 +132,35 @@ my $image = Image::Base::X11::Protocol::Window->new
    -window => $win);
 
 MyTestImageBase::check_image ($image);
+MyTestImageBase::check_diamond ($image);
 
-# resetting from None?
-# getting border when reading back outermost pixels?
-#
-# SKIP: {
-#   $X->init_extension('SHAPE')
-#     or skip 'SHAPE extension not available', 2144;
-#
-#   $image->rectangle (0,0, $width-1,$height-1, '#000000', 0);
-#   # $image->xy(0,0, 'None');
-#   # is ($image->xy(0,0), '#FFFFFFFFFFFF',
-#   #     'xy() pixel see through to under win');
-#
-#   # $MyTestImageBase::black = 'black';
-#   # $MyTestImageBase::white = 'None';
-#   # $MyTestImageBase::white_expect = 'white';
-#   # MyTestImageBase::check_image ($image);
-# }
+# 6526-3262=3264
+if (1||! $X->init_extension('SHAPE')) {
+  MyTestHelpers::diag ('SHAPE extension not available');
+  foreach (1 .. 3264) {
+    skip ('SHAPE extension not available', 1, 1);
+  }
+} else {
+  my $image_clear_func = sub {
+    $X->ShapeRectangles ($win,
+                         'Bounding',
+                         'Set',
+                         0,0, # offset
+                         'YXBanded',
+                         [ 0,0, $width,$height ]);
+    $X->ClearArea($win, 0,0, 0,0, 0);
+  };
+  &$image_clear_func();
+
+  $image->rectangle (0,0, $width-1,$height-1, '#000000', 0);
+  $image->xy(0,0, 'None');
+  ok ($image->xy(0,0), 'None', 'xy() pixel None');
+  ok ($image->xy(1,1) ne 'None', 1, 'xy() pixel not None');
+  &$image_clear_func();
+
+  local $MyTestImageBase::white = 'None';
+  MyTestImageBase::check_image ($image, image_clear_func => $image_clear_func);
+  MyTestImageBase::check_diamond ($image, image_clear_func=>$image_clear_func);
+}
 
 exit 0;

@@ -16,6 +16,11 @@
 # with Image-Base-X11-Protocol.  If not, see <http://www.gnu.org/licenses/>.
 
 
+# X11::Protocol::Ext::SHAPE
+# /usr/share/doc/x11proto-xext-dev/shape.txt.gz
+# /usr/share/doc/x11proto-core-dev/x11protocol.txt.gz
+#
+
 package Image::Base::X11::Protocol::Window;
 use 5.004;
 use strict;
@@ -25,10 +30,10 @@ use vars '@ISA', '$VERSION';
 use Image::Base::X11::Protocol::Drawable;
 @ISA = ('Image::Base::X11::Protocol::Drawable');
 
-$VERSION = 9;
+$VERSION = 10;
 
 # uncomment this to run the ### lines
-#use Smart::Comments;
+#use Devel::Comments;
 
 sub new {
   my ($class, %params) = @_;
@@ -110,19 +115,46 @@ sub set {
 sub xy {
   my ($self, $x, $y, $colour) = @_;
   ### Window xy(): "$x, $y".(@_>=4 && ", $colour")
-  if (@_ >= 4
-      && $colour eq 'None'
-      && (my $X = $self->{'-X'}) ->{'ext'}->{'SHAPE'}) {
-    ### subtract shape
-    $X->ShapeRectangles ($self->{'-drawable'},
-                         'Bounding',
-                         'Subtract',
-                         0,0, # offset
-                         'YXBanded',
-                         [ $x,$y, 1,1 ]);
-  } else {
-    shift->SUPER::xy (@_);
+  if ((my $X = $self->{'-X'}) ->{'ext'}->{'SHAPE'}) {
+    if (@_ >= 4) {
+      if ($colour eq 'None') {
+        ### Window xy() subtract shape ...
+        $X->ShapeRectangles ($self->{'-drawable'},
+                             'Bounding',
+                             'Subtract',
+                             0,0, # offset
+                             'YXBanded',
+                             [ $x,$y, 1,1 ]);
+      }
+    } else {
+      ### Window xy() fetch shape ...
+      my ($ordering, @rects) = $X->ShapeGetRectangles ($self->{'-drawable'},
+                                                       'Bounding');
+      ### @rects
+      if (! _rects_contain_xy($x,$y,@rects)) {
+        return 'None';
+      }
+    }
   }
+  shift->SUPER::xy (@_);
+}
+
+# for any order except Unsorted could stop searching when $ry > $y, if
+# seemed worth extra code
+sub _rects_contain_xy {
+  ### _rects_contain_xy() ...
+  my $x = shift;
+  my $y = shift;
+  while (@_) {
+    my ($rx,$ry,$width,$height) = @{(shift)};
+    if ($rx <= $x && $rx+$width > $x
+        && $ry <= $y && $ry+$height > $y) {
+      ### found: "$x,$y  in  $rx,$ry, $width,$height"
+      return 1;
+    }
+  }
+  ### not found ...
+  return 0;
 }
 
 sub line {
@@ -131,15 +163,16 @@ sub line {
 
   if ($colour eq 'None'
       && (my $X = $self->{'-X'}) ->{'ext'}->{'SHAPE'}) {
-    my $width = $x2 - $x1 + 1;
-    my $height = $y2 - $y1 + 1;
-    my ($bitmap, $bitmap_gc) = _make_bitmap_and_gc ($self, $width, $height);
-    ### PolySegment: $bitmap, $bitmap_gc, 0,0, $width-1,$height-1
-    $X->PolySegment ($bitmap, $bitmap_gc, 0,0, $width-1,$height-1);
+    my $xmin = ($x1 < $x2 ? $x1 : $x2);
+    my $ymin = ($y1 < $y2 ? $y1 : $y2);
+    my ($bitmap, $bitmap_gc) = _make_bitmap_and_gc
+      ($self, abs($x2-$x1)+1, abs($y2-$y1)+1);   # width,height
+    $X->PolySegment ($bitmap, $bitmap_gc,
+                     $x1-$xmin,$y1-$ymin, $x2-$xmin,$y2-$ymin);
     $X->ShapeMask ($self->{'-drawable'},
                    'Bounding',
                    'Subtract',
-                   $x1,$y1, # offset
+                   $xmin,$ymin, # offset
                    $bitmap);
     $X->FreePixmap ($bitmap);
   } else {
@@ -152,41 +185,59 @@ sub rectangle {
   ### Window rectangle: $x1, $y1, $x2, $y2, $colour, $fill
   if ($colour eq 'None'
       && (my $X = $self->{'-X'}) ->{'ext'}->{'SHAPE'}) {
+    my @rects;
+    my $width = $x2 - $x1 + 1;
+    my $height = $y2 - $y1 + 1;
     if ($fill
-        || abs($x1-$x2) <= 1
-        || abs($y1-$y2) <= 1) {
-      $X->ShapeRectangles ($self->{'-drawable'},
-                           'Bounding',
-                           'Subtract',
-                           0,0, # offset
-                           'YXBanded',
-                           [ $x1, $y1,
-                             $x2 - $x1 + 1,
-                             $y2 - $y1 + 1 ]);
+        || $width <= 2
+        || $height <= 2) {
+      # filled, or unfilled 2xN or Nx2, as one rectangle
+      @rects = ([ $x1, $y1, $width, $height ]);
     } else {
-      my $width = $x2 - $x1 + 1;
-      my $height = $y2 - $y1 + 1;
-      my ($bitmap, $bitmap_gc) = _make_bitmap_and_gc ($self, $width, $height);
-      $X->PolyRectangle ($bitmap,
-                         $bitmap_gc,
-                         [ 0,0, $width-1, $height-1 ]);
-      $X->ShapeMask ($self->{'-drawable'},
-                     'Bounding',
-                     'Subtract',
-                     $x1,$y1, # offset
-                     $bitmap);
-      $X->FreePixmap ($bitmap);
+      @rects = ([ $x1, $y1,   $width, 1    ],  # top
+                [ $x1,$y1+1,  1, $height-2 ],  # left
+                [ $x2,$y1+1,  1, $height-2 ],  # right
+                [ $x1, $y2,   $width, 1    ]); # bottom
     }
+    $X->ShapeRectangles ($self->{'-drawable'},
+                         'Bounding',
+                         'Subtract',
+                         0,0, # offset
+                         'YXBanded', @rects);
+
+    # my ($bitmap, $bitmap_gc) = _make_bitmap_and_gc ($self, $width, $height);
+    # $X->PolyRectangle ($bitmap,
+    #                    $bitmap_gc,
+    #                    [ 0,0, $width-1, $height-1 ]);
+    # $X->ShapeMask ($self->{'-drawable'},
+    #                'Bounding',
+    #                'Subtract',
+    #                $x1,$y1, # offset
+    #                $bitmap);
+    # $X->FreePixmap ($bitmap);
+
   } else {
     $self->SUPER::rectangle ($x1, $y1, $x2, $y2, $colour, $fill);
+  }
+}
+sub Image_Base_Other_rectangles {
+  ### X11-Protocol-Window rectangles() ...
+  my $self = shift;
+  my $colour = shift;
+  my $fill = shift;
+
+  # ENHANCE-ME: multiple rectangles at once to ShapeRectangles()
+  ### rectangles: @_
+  while (@_) {
+    $self->rectangle (shift,shift,shift,shift, $colour, $fill);
   }
 }
 
 sub ellipse {
   my ($self, $x1,$y1, $x2,$y2, $colour, $fill) = @_;
-  ### Window ellipse: $x1,$y1, $x2,$y2, $colour
+  ### Window ellipse(): $x1,$y1, $x2,$y2, $colour
   if ($colour eq 'None'
-      &&  (my $X = $self->{'-X'}) ->{'ext'}->{'SHAPE'}) {
+      && (my $X = $self->{'-X'}) ->{'ext'}->{'SHAPE'}) {
     ### use shape
     my $win = $self->{'-drawable'};
     my $width = $x2 - $x1 + 1;
@@ -219,8 +270,46 @@ sub ellipse {
   }
 }
 
+sub diamond {
+  my ($self, $x1,$y1, $x2,$y2, $colour, $fill) = @_;
+  ### Window diamond(): $x1,$y1, $x2,$y2, $colour
+  if ($colour eq 'None'
+      && (my $X = $self->{'-X'}) ->{'ext'}->{'SHAPE'}) {
+    ### use shape
+    my $win = $self->{'-drawable'};
+
+
+    if ($x1==$x2 && $y1==$y2) {
+      # 1x1 polygon draws nothing, do it as a point instead
+      $X->ShapeRectangles ($self->{'-drawable'},
+                           'Bounding',
+                           'Subtract',
+                           0,0, # offset
+                           'YXBanded',
+                           [ $x1,$y1, 1,1 ]);
+
+    } else {
+      $x2 -= $x1;   # offset so 0,0 to x2,y2
+      $y2 -= $y1;
+      my ($bitmap, $bitmap_gc)
+        = _make_bitmap_and_gc ($self, $x2+1, $y2+1);  # width,height
+      Image::Base::X11::Protocol::Drawable::_diamond_drawable
+          ($X, $bitmap, $bitmap_gc, 0,0, $x2,$y2, $fill);
+      $X->ShapeMask ($self->{'-drawable'},
+                     'Bounding',
+                     'Subtract',
+                     $x1,$y1,     # offset
+                     $bitmap);
+      $X->FreePixmap ($bitmap);
+    }
+  } else {
+    shift->SUPER::diamond (@_);
+  }
+}
+
 sub _make_bitmap_and_gc {
   my ($self, $width, $height) = @_;
+  ### _make_bitmap_and_gc(): "$width,$height"
   my $X = $self->{'-X'};
 
   my $bitmap = $X->new_rsrc;
@@ -293,8 +382,9 @@ There's no file load or save, just drawing operations.
 
 As an experimental feature, if the C<X11::Protocol> object has the SHAPE
 extension available and initialized then colour "None" means transparent and
-drawing it subtracts from the window's shape, making see-though holes.  Is
-this worthwhile?
+drawing it subtracts from the window's shape, making see-though holes.  This
+is fun, and makes "None" more or less work like other C<Image::Base>
+subclasses, but is perhaps of marginal actual use.
 
 =head1 FUNCTIONS
 
@@ -334,10 +424,10 @@ Changing these resizes the window (C<ConfigureWindow>).  See the base
 Drawable class for the way fetching uses C<GetGeometry>.
 
 The maximum size allowed by the protocol is 32767x32767, and minimum 1x1.
-When creating or resizing currently the sizes are chopped by Perl's C<pack>
-to a signed 16 bits, which means 32768 to 65535 results in an X protocol
-error (being negatives), but for instance 65546 wraps around to 10 and will
-seem to work.
+When creating or resizing currently the sizes end up chopped by Perl's
+C<pack> to a signed 16 bits, which means 32768 to 65535 results in an X
+protocol error (being negatives), but for instance 65546 wraps around to 10
+and will seem to work.
 
 In the current code a window size change made outside this wrapper
 (including perhaps by the user through the window manager) is not noticed by
@@ -359,7 +449,9 @@ where the drawing operations should allocate colours.
 L<Image::Base>,
 L<Image::Base::X11::Protocol::Drawable>,
 L<Image::Base::X11::Protocol::Pixmap>,
-L<X11::Protocol>
+
+L<X11::Protocol>,
+L<X11::Protocol::Ext::SHAPE>
 
 =head1 HOME PAGE
 
