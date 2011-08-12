@@ -16,6 +16,9 @@ You can get a copy of the GNU General Public License online at
 <http://www.gnu.org/licenses/>.
 
 
+Version 11, August 2011
+    - Drawable ellipse() use rectangle for 2-high too
+
 Version 10, July 2011
     - diamond() using PolyLine/FillPoly
     - Window line() fix some of the experimental "None" drawing

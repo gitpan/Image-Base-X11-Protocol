@@ -30,7 +30,7 @@ use vars '@ISA', '$VERSION';
 use Image::Base::X11::Protocol::Drawable;
 @ISA = ('Image::Base::X11::Protocol::Drawable');
 
-$VERSION = 10;
+$VERSION = 11;
 
 # uncomment this to run the ### lines
 #use Devel::Comments;
@@ -240,19 +240,19 @@ sub ellipse {
       && (my $X = $self->{'-X'}) ->{'ext'}->{'SHAPE'}) {
     ### use shape
     my $win = $self->{'-drawable'};
-    my $width = $x2 - $x1 + 1;
-    my $height = $y2 - $y1 + 1;
-    if ($width <= 2 || $height <= 2) {
+    my $w = $x2 - $x1;
+    my $h = $y2 - $y1;
+    if ($w <= 1 || $h <= 1) {
       $X->ShapeRectangles ($win,
                            'Bounding',
                            'Subtract',
                            0,0, # offset
                            'YXBanded',
-                           [ $x1, $y1, $width, $height ]);
+                           [ $x1, $y1, $w+1, $h+1 ]);
     } else {
-      my ($bitmap, $bitmap_gc) = _make_bitmap_and_gc ($self, $width, $height);
+      my ($bitmap, $bitmap_gc) = _make_bitmap_and_gc ($self, $w, $h);
       # fill+outline per comments in Drawable.pm
-      my @args = ($bitmap, $bitmap_gc, [ 0, 0, $width, $height, 0, 365*64 ]);
+      my @args = ($bitmap, $bitmap_gc, [ 0, 0, $w, $h, 0, 365*64 ]);
       if ($fill) {
         $X->PolyFillArc (@args);
       }

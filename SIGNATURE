@@ -15,35 +15,36 @@ not run its Makefile.PL or Build.PL.
 Hash: SHA1
 
 SHA1 842745cb706f8f2126506f544492f7a80dbe29b3 COPYING
-SHA1 80e3936c7a9bbd63733e92bef67a624f38742156 Changes
-SHA1 a58edfc66214058984622ed8e1628dd3ca68cb74 MANIFEST
+SHA1 02891169a92108663ea459fc7bcd43c97ba25c94 Changes
+SHA1 0100f279ec910f7443d80b2f623bd429c3d3f298 MANIFEST
 SHA1 1d745ef4cc154d3b13bfee6d1048ac4135fc1aa7 MANIFEST.SKIP
-SHA1 7565a588d5affc629a826cc4da316444ac86fc2f META.yml
+SHA1 16cd24dd9e0e96054f749bb11effb44dfb150ce1 META.yml
 SHA1 5622d37feae3ae590ffd1f6d13d47caaaf3a47f7 Makefile.PL
-SHA1 34d7dadd6bc71cf275ef34676c339f0464ccdc30 debian/changelog
+SHA1 a6af2973c1e4209691be5cda54df62d0d9c79b9c debian/changelog
 SHA1 ac3478d69a3c81fa62e60f5c3696165a4e5e6ac4 debian/compat
 SHA1 b37a39c1176ad160aee6238e25f908b7ad738a92 debian/control
 SHA1 bb4764cfd93a1e58d614bd145c1f41cfe360ae62 debian/copyright
 SHA1 475fe9ee247bb0a6a157e9ec55acdf7e8f002f5b debian/rules
 SHA1 61652cd1568dcf2614df833eba241755eee34e89 debian/source/format
 SHA1 91270a1ffdd38a263f93722d343f937091b62c8e debian/watch
+SHA1 8b83d9b515ca1d5fe579e242b622477ec5c63179 devel/Picture.pm
 SHA1 a45222b732998f2f1c2aabaa7e3373b43f2e52cc devel/seq-wrap.pl
 SHA1 d9eedaf7fdd70ac67dcb441252248447fd8c2322 devel/x11-protocol.pl
 SHA1 381dbddfd3128f0962f4e7590e1a2a40dbbe6078 devel/xwd.pl
 SHA1 0ac705d06d01f37e7fb8d20334cad0b862018df7 examples/view-xbm.pl
-SHA1 d34492ea04ab0f004fbb3c5ca8a6bd42a216844e inc/MyMakeMakerExtras.pm
+SHA1 4b1a3d9217d81794abcbf621b24b200df07f7499 inc/MyMakeMakerExtras.pm
 SHA1 7a988b2aa7ed09f1cb9029a1ef3f0e2139dca0cf inc/my_pod2html
-SHA1 8bafac19f89cdb341b7d952e94d7b4071f58fa33 lib/Image/Base/X11/Protocol/Drawable.pm
-SHA1 800f529760967fd33f69749ff80741358b72ccff lib/Image/Base/X11/Protocol/Pixmap.pm
-SHA1 52acfde3fa03a6e47f7d20b9b2520e0a5212fa24 lib/Image/Base/X11/Protocol/Window.pm
+SHA1 a450a1d97d2d7a4248171c773e2185b50a89c371 lib/Image/Base/X11/Protocol/Drawable.pm
+SHA1 a12bdafdb381323fc553a2f293e4e0ca7273168a lib/Image/Base/X11/Protocol/Pixmap.pm
+SHA1 d08424176cc739128dc45cfdf7198f2f01eb1a7c lib/Image/Base/X11/Protocol/Window.pm
 SHA1 9c35ff31c7aad10dc821546ef53247086f3ce12e t/Drawable-use.t
-SHA1 cb1f3a74f8e4b30a986e13be4eef2161e7a0f256 t/Drawable.t
+SHA1 f3e89a04e104317768674c8048b41ce293ba78d0 t/Drawable.t
 SHA1 016f6f5865d54130d50f400fb630091bd1a6c76f t/MyTestHelpers.pm
 SHA1 2844313f42e403c3f519e5a22c01cb3c92ca0454 t/MyTestImageBase.pm
-SHA1 7c444fe86b6e380d67a5b56f955feb453fbb0e85 t/Pixmap.t
+SHA1 391cfcb24f009d0b9a6de874501e987fd9f050bf t/Pixmap.t
 SHA1 0209aad325c7f2bda9915ddabad5f31ada8d17e6 t/Window-use.t
 SHA1 725e3001aa852fbfe12350d7ad9b88d3ef4d2ee7 t/Window-visible.t
-SHA1 544e2cbbd58454a9d6e04749e81b4200753ba1d3 t/Window.t
+SHA1 57a6ed7f6ba9b42d7582bec56c5d345c07d56b51 t/Window.t
 SHA1 0279c9310ec528d10a2a14e602bf98f1c776cce1 xt/0-META-read.t
 SHA1 219395eb91b03829e6f14db4ebd57d88ea972e61 xt/0-Test-ConsistentVersion.t
 SHA1 8a5e0f34131de34e584fbb1939c191a152566155 xt/0-Test-DistManifest.t
@@ -55,7 +56,7 @@ SHA1 daba2840c7f128371d42516619a0e04fee2f5ff4 xt/0-no-debug-left-on.t
 -----BEGIN PGP SIGNATURE-----
 Version: GnuPG v1.4.11 (GNU/Linux)
 
-iD8DBQFOM1lnLFMCIV9q3ToRAn9MAJsG6QvtntWTapMfV1ThqrApi7MqwACgrMiE
-SvPup/02rnwtUfwv9dmKxHA=
-=KfDb
+iD8DBQFORbFYLFMCIV9q3ToRAhzeAJ9SegVZtG5izSB/RdhDcBqoVbX+sQCfb40V
+yqo3AfVB4NM/DXFXFHI55ck=
+=T/tR
 -----END PGP SIGNATURE-----

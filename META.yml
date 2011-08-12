@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               Image-Base-X11-Protocol
-version:            10
+version:            11
 abstract:           Image::Base drawing into X windows and pixmaps using X11::Protocol.
 author:
     - Kevin Ryde <user42@zip.com.au>
@@ -34,18 +34,15 @@ optional_features:
     maximum_devel:
         description:  Stuff used variously for development.
         requires:
-            Pod::Simple::HTML:  0
-            Smart::Comments:    0
-            warnings::unused:   0
-    maximum_tests:
-        description:  Have "make test" do as much as possible.
-        requires:
             File::Spec:          0
             Parse::CPAN::Meta:   0
+            Pod::Simple::HTML:   0
+            Smart::Comments:     0
             Test::DistManifest:  0
             Test::Pod:           1.00
             Test::Synopsis:      0
             Test::YAML::Meta:    0.15
+            warnings::unused:    0
             YAML:                0
             YAML::Syck:          0
             YAML::Tiny:          0

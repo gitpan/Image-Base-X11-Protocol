@@ -66,7 +66,7 @@ my $X_screen_number = X_chosen_screen_number($X);
 #------------------------------------------------------------------------------
 # VERSION
 
-my $want_version = 10;
+my $want_version = 11;
 ok ($Image::Base::X11::Protocol::Pixmap::VERSION,
     $want_version,
     'VERSION variable');

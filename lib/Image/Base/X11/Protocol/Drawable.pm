@@ -30,7 +30,7 @@ use vars '@ISA', '$VERSION';
 use Image::Base;
 @ISA = ('Image::Base');
 
-$VERSION = 10;
+$VERSION = 11;
 
 # uncomment this to run the ### lines
 #use Devel::Comments '###';
@@ -268,7 +268,7 @@ sub Image_Base_Other_xy_points {
                    splice @_, 0,$maxpoints);
   }
   ### PolyPoint: scalar(@_)
-  $self->{'-X'}->PolyPoint ($self->{'-drawable'}, $gc, 'Origin', @_);
+  $X->PolyPoint ($self->{'-drawable'}, $gc, 'Origin', @_);
 }
 
 # not yet a documented feature ...
@@ -400,15 +400,15 @@ sub Image_Base_Other_rectangles {
 sub ellipse {
   my ($self, $x1, $y1, $x2, $y2, $colour, $fill) = @_;
   ### Drawable ellipse(): $x1, $y1, $x2, $y2, $colour
-  if (abs($x1-$x2) <= 1 || abs($y1-$y2) < 1) {
+  my $w = $x2 - $x1;
+  my $h = $y2 - $y1;
+  if ($w <= 1 || $h <= 1) {
     # 1 or 2 pixels wide or high
     shift->rectangle(@_);
   } else {
     ### PolyArc: $x1, $y1, $x2-$x1+1, $y2-$y1+1, 0, 360*64
-    my @args = ($self->{'-drawable'},
-                _gc_colour($self,$colour),
-                [ $x1, $y1, $x2-$x1, $y2-$y1,
-                  0, 360*64 ]);
+    my @args = ($self->{'-drawable'}, _gc_colour($self,$colour),
+                [ $x1, $y1, $w, $h, 0, 360*64 ]);
     my $X = $self->{'-X'};
     if ($fill) {
       $X->PolyFillArc (@args);
