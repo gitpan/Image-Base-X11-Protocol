@@ -30,7 +30,7 @@ use vars '@ISA', '$VERSION';
 use Image::Base;
 @ISA = ('Image::Base');
 
-$VERSION = 11;
+$VERSION = 12;
 
 # uncomment this to run the ### lines
 #use Devel::Comments '###';
@@ -437,12 +437,16 @@ sub diamond {
 # shared by Image::Base::X11::Protocol::Window::diamond()
 sub _diamond_drawable {
   my ($X, $drawable, $gc, $x1, $y1, $x2, $y2, $fill) = @_;
-  my $xh = ($x2 - $x1 + 1);
-  my $yh = ($y2 - $y1 + 1);
-  my $xeven = ! ($xh & 1);
-  my $yeven = ! ($yh & 1);
+
+  my $xh = ($x2 - $x1);
+  my $yh = ($y2 - $y1);
+  my $xeven = ($xh & 1);
+  my $yeven = ($yh & 1);
   $xh = int($xh / 2);
   $yh = int($yh / 2);
+  ### assert: $x1+$xh+$xeven == $x2-$xh
+  ### assert: $y1+$yh+$yeven == $y2-$yh
+
   my @args =('Origin',
 
              $x1+$xh, $y1,  # top centre

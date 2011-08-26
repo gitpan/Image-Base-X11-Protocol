@@ -284,6 +284,10 @@ HERE
   $post .= <<'HERE';
 pc:
 HERE
+  # ------ pc: test vars ------
+  # the "." obscures it from MyExtractUse.pm
+  $post .= "\t-\$(PERLRUNINST) -e 'use "."Test::Vars; all_vars_ok()'\n";
+
   # ------ pc: podcoverage ------
   foreach (@{$my_options{'MyMakeMakerExtras_Pod_Coverage'}}) {
     my $class = $_;
@@ -447,7 +451,7 @@ lintian-source:
 	mv -T $(DISTVNAME) $(DEBNAME)-$(VERSION); \
 	dpkg-source -b $(DEBNAME)-$(VERSION) \
 	               $(DEBNAME)_$(VERSION).orig.tar.gz; \
-	lintian -I -i --suppress-tags empty-debian-diff *.dsc; \
+	lintian -I -i --suppress-tags empty-debian-diff,debian-rules-uses-deprecated-makefile *.dsc; \
 	cd ..; \
 	rm -rf temp-lintian
 

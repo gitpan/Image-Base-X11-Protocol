@@ -30,7 +30,7 @@ use vars '@ISA', '$VERSION';
 use Image::Base::X11::Protocol::Drawable;
 @ISA = ('Image::Base::X11::Protocol::Drawable');
 
-$VERSION = 11;
+$VERSION = 12;
 
 # uncomment this to run the ### lines
 #use Devel::Comments;
@@ -277,7 +277,6 @@ sub diamond {
       && (my $X = $self->{'-X'}) ->{'ext'}->{'SHAPE'}) {
     ### use shape
     my $win = $self->{'-drawable'};
-
 
     if ($x1==$x2 && $y1==$y2) {
       # 1x1 polygon draws nothing, do it as a point instead

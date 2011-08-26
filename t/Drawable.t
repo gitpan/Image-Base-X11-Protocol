@@ -64,7 +64,7 @@ my $X_screen_number = MyTestHelpers::X11_chosen_screen_number($X);
 #------------------------------------------------------------------------------
 # VERSION
 
-my $want_version = 11;
+my $want_version = 12;
 ok ($Image::Base::X11::Protocol::Drawable::VERSION,
     $want_version, 'VERSION variable');
 ok (Image::Base::X11::Protocol::Drawable->VERSION,

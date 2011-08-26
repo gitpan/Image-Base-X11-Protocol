@@ -34,6 +34,44 @@ use MyTestImageBase;
   $ENV{'DISPLAY'} = ':0';
   my $X = X11::Protocol->new;
   $X->init_extension('SHAPE');
+
+  my $win = $X->new_rsrc;
+  $X->CreateWindow($win, $X->root,
+                   'InputOutput',
+                   $X->root_depth,
+                   'CopyFromParent',
+                   0,0,
+                   50,25,
+                   0,   # border
+                   background_pixel => $X->{'white_pixel'},
+                   override_redirect => 1,
+                   colormap => 'CopyFromParent',
+                  );
+  $X->MapWindow ($win);
+  $X->ClearArea ($win, 0,0,0,0);
+
+  my $image = Image::Base::X11::Protocol::Window->new
+    (-X => $X,
+     -window => $win);
+  $image->rectangle (0,0, 49,24, 'black', 1);
+
+  $image->diamond (1,1,6,6, 'white');
+  $image->diamond (11,1,16,6, 'white', 1);
+  $image->diamond (1,10,7,16, 'white');
+  $image->diamond (11,10,17,16, 'white', 1);
+
+  $X->flush;
+  sleep 1;
+
+  system ("xwd -id $win >/tmp/x.xwd && convert /tmp/x.xwd /tmp/x.xpm && cat /tmp/x.xpm");
+  exit 0;
+}
+
+
+{
+  $ENV{'DISPLAY'} = ':0';
+  my $X = X11::Protocol->new;
+  $X->init_extension('SHAPE');
   { local $,=' ', say keys %{$X->{'ext'}}; }
 
   my $win = $X->new_rsrc;
