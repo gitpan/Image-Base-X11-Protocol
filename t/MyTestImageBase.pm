@@ -1,6 +1,6 @@
 # MyTestImageBase.pm -- some tests for Image::Base subclasses
 
-# Copyright 2010, 2011 Kevin Ryde
+# Copyright 2010, 2011, 2012 Kevin Ryde
 
 # MyTestImageBase.pm is shared by several distributions.
 #
@@ -62,7 +62,7 @@ sub max {
 
 sub is {
   &$handle_input();
-  if (Test::More->can('is')) {
+  if (eval { Test::More->can('is') }) {
     if (defined $skip) {
     SKIP: {
         &Test::More::skip ($skip, 1); # no prototypes
@@ -95,6 +95,7 @@ sub dump_image {
   if (defined $skip) {
     return;
   }
+  require MyTestHelpers;
   my $width = $image->get('-width');
   my $height = $image->get('-height');
   MyTestHelpers::diag("dump_image");
@@ -117,14 +118,17 @@ sub dump_image {
     }
     MyTestHelpers::diag($str);
   }
+
   if (my $canvas = $image->get('-tkcanvas')) {
     my @items = $canvas->find('all');
     MyTestHelpers::diag("item count ",scalar(@items));
-    foreach my $item (@items) {
+    my $item;
+    foreach $item (@items) {
       my $type = $canvas->type($item);
       my @coords = $canvas->coords($item);
       my @opts;
-      foreach my $spec ($canvas->itemconfigure($item)) {
+      my $spec;
+      foreach $spec ($canvas->itemconfigure($item)) {
         my $key = $spec->[0];
         if ($key eq '-fill') {
           my $value = $canvas->itemcget($item,$key);
@@ -309,6 +313,34 @@ my @sizes = ([0,0, 0,0],    # 1x1
              [1,1, 18,8],   # big
             );
 
+sub check_xy {
+  my ($image, %options) = @_;
+  my $big_fetch_expect = $options{'big_fetch_expect'};
+
+  my $big_negative = -2**16 + 2;
+  # exercise some negatives
+  $image->xy ($big_negative,0, $white);
+  $image->xy (0,$big_negative, $white);
+  $image->xy ($big_negative,$big_negative, $white);
+  is (scalar($image->xy($big_negative,$big_negative)), $big_fetch_expect,
+      'xy() negative fetch');
+  is (scalar($image->xy(0,$big_negative)), $big_fetch_expect,
+      'xy() negative fetch');
+  is (scalar($image->xy($big_negative,0)), $big_fetch_expect,
+      'xy() negative fetch');
+
+  my $big_positive = 2**16 + 2;
+  $image->xy ($big_positive,$big_positive, $white);
+  $image->xy (0,$big_positive, $white);
+  $image->xy ($big_positive,0, $white);
+  is (scalar($image->xy(0,$big_positive)), $big_fetch_expect,
+      'xy() big positive fetch');
+  is (scalar($image->xy($big_positive,0)), $big_fetch_expect,
+      'xy() big positive fetch');
+  is (scalar($image->xy($big_positive,$big_positive)), $big_fetch_expect,
+      'xy() big positive fetch');
+}
+
 sub check_line {
   my ($image, %options) = @_;
   my ($width, $height) = $image->get('-width','-height');
@@ -368,6 +400,14 @@ sub check_rectangle {
                    ($image->can('Image_Base_Other_rectangles')
                     ? ('MyTestImageBase::rect_using_Other')
                     : ())) {
+
+    # exercise some negatives
+    foreach my $fill (0,1) {
+      $image->$method (-100,-100,-10,-10, $white, $fill);
+      $image->$method (-100,-100,5,5, $white, $fill);
+      $image->$method (5,5,200,200, $white, $fill);
+    }
+
 
     my $elem;
     foreach $elem (@sizes) {
@@ -531,9 +571,15 @@ sub check_image {
     my ($width, $height) = $image->get('-width','-height');
     sub {
       $image->rectangle (0,0, $width-1,$height-1, $black, 1);
+      # { print "blank to\n"; dump_image($image); }
     }
   };
 
+  ### $white
+  ### $black
+  ### $white_expect
+
+  check_xy ($image, %options);
   check_line ($image, %options);
   check_rectangle ($image, %options);
   check_ellipse ($image, %options);

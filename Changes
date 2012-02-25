@@ -1,4 +1,4 @@
-Copyright 2010, 2011 Kevin Ryde
+Copyright 2010, 2011, 2012 Kevin Ryde
 
 This file is part of Image-Base-X11-Protocol.
 
@@ -16,6 +16,10 @@ You can get a copy of the GNU General Public License online at
 <http://www.gnu.org/licenses/>.
 
 
+
+Version 13, February 2012
+    - Drawable clip to 0,0,32767,32767 which is maximum drawable
+    - Window fix for ellipse() transparent "None"
 
 Version 12, August 2011
     - fix Drawable diamond() coordinates

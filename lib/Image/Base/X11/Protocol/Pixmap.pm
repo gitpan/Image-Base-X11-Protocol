@@ -1,4 +1,4 @@
-# Copyright 2010, 2011 Kevin Ryde
+# Copyright 2010, 2011, 2012 Kevin Ryde
 
 # This file is part of Image-Base-X11-Protocol.
 #
@@ -26,7 +26,7 @@ use vars '@ISA', '$VERSION';
 use Image::Base::X11::Protocol::Drawable;
 @ISA = ('Image::Base::X11::Protocol::Drawable');
 
-$VERSION = 12;
+$VERSION = 13;
 
 # uncomment this to run the ### lines
 #use Smart::Comments;
@@ -106,7 +106,7 @@ sub set {
 1;
 __END__
 
-=for stopwords undef Ryde pixmap pixmaps XID colormap ie
+=for stopwords undef Ryde pixmap pixmaps XID colormap ie drawable superclasses
 
 =head1 NAME
 
@@ -144,6 +144,9 @@ draw into X pixmaps by sending drawing requests to an X server using
 C<X11::Protocol>.  There's no file load or save, just drawing operations.
 
 =head1 FUNCTIONS
+
+See L<Image::Base::X11::Protocol::Drawable/FUNCTIONS> and
+L<Image::Base/FUNCTIONS> for behaviour inherited from the superclasses.
 
 =over 4
 
@@ -234,7 +237,7 @@ http://user42.tuxfamily.org/image-base-x11-protocol/index.html
 
 =head1 LICENSE
 
-Image-Base-X11-Protocol is Copyright 2010, 2011 Kevin Ryde
+Image-Base-X11-Protocol is Copyright 2010, 2011, 2012 Kevin Ryde
 
 Image-Base-X11-Protocol is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License as published by

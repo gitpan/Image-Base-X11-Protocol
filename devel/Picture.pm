@@ -1,4 +1,4 @@
-# Copyright 2010, 2011 Kevin Ryde
+# Copyright 2010, 2011, 2012 Kevin Ryde
 
 # This file is part of Image-Base-X11-Protocol.
 #
@@ -33,7 +33,7 @@ use vars '@ISA', '$VERSION';
 use Image::Base;
 @ISA = ('Image::Base');
 
-$VERSION = 12;
+$VERSION = 13;
 
 # uncomment this to run the ### lines
 #use Devel::Comments '###';
@@ -119,8 +119,23 @@ sub line {
 sub rectangle {
   my ($self, $x1, $y1, $x2, $y2, $colour, $fill) = @_;
   ### X11-Protocol-Picture rectangle
+
+  # clip to 0 .. 2^15-1 possible maximum drawable, no need to find out the
+  # actual size
+  ($x2 >= 0 && $y2 >= 0 && $x1 <= 32767 && $y1 <= 32767)
+    or return;
+
+  # don't underflow INT16 -32768 x,y in request
+  if ($x1 < 0) { $x1 = 0; }
+  if ($y1 < 0) { $y1 = 0; }
+
+  # don't overflow CARD16 width,height in request
+  if ($x2 > 32767) { $x2 = 32767; }
+  if ($y2 > 32767) { $y2 = 32767; }
+
   my @rects;
   if (! $fill && $y2-$y1 >= 2) {
+    # unfilled, line segments
     @rects = ([ $x1, $y1, $x2-$x1+1, 1 ],   # top
               [ $x1,$y1+1, 1, $y2-$y1-1 ],  # left
               [ $x2,$y1+1, 1, $y2-$y1-1 ]); # right
@@ -391,6 +406,6 @@ Width and height ...
 =head1 SEE ALSO
 
 L<Image::Base>,
-L<X11::Protocol::Ext::RENDER>,
+L<X11::Protocol::Ext::RENDER>
 
 =cut

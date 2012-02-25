@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# Copyright 2010, 2011 Kevin Ryde
+# Copyright 2010, 2011, 2012 Kevin Ryde
 
 # This file is part of Image-Base-X11-Protocol.
 #
@@ -29,6 +29,48 @@ use Smart::Comments;
 use lib 't';
 use MyTestImageBase;
 
+
+{
+  $ENV{'DISPLAY'} ||= ':0';
+  my $X = X11::Protocol->new;
+  # ### $X
+  my $rootwin = $X->{'root'};
+  $X->QueryPointer($rootwin);  # sync
+
+  my $width = 32767;
+  my $height = 32767;
+  my $image = Image::Base::X11::Protocol::Pixmap->new
+    (-X      => $X,
+     -width  => $width,
+     -height => $height,
+     -depth  => 1, # bitmap
+    );
+  $image->rectangle(0,0, $width-1,$height-1, 'set', 1);
+
+
+  $image->rectangle(0,0, $width,$height, 'clear');
+  ### pixel: $image->xy($width-1,$height-1)
+  ### pixel: $image->xy($width-2,$height-2)
+
+  $image->rectangle(0,0, $width-1,$height-1, 'clear', 1);
+  $image->rectangle(0,0, $width-1,$height-1, 'set');
+  ### pixel: $image->xy($width-1,$height-1)
+  ### pixel: $image->xy($width-2,$height-2)
+
+  $image->rectangle(0,0, $width-1,$height-1, 'clear', 1);
+  ### pixel: $image->xy($width-1,$height-1)
+  ### pixel: $image->xy($width-2,$height-2)
+
+  $image->rectangle(0,0, $width-1,$height-1, 'set', 1);
+  ### pixel: $image->xy($width-1,$height-1)
+  ### pixel: $image->xy($width-2,$height-2)
+
+  $X->QueryPointer($rootwin);  # sync
+  x_resource_dump($X);
+  undef $image;
+  x_resource_dump($X);
+  exit 0;
+}
 
 {
   $ENV{'DISPLAY'} = ':0';

@@ -1,4 +1,4 @@
-# Copyright 2010, 2011 Kevin Ryde
+# Copyright 2010, 2011, 2012 Kevin Ryde
 
 # This file is part of Image-Base-X11-Protocol.
 #
@@ -30,7 +30,7 @@ use vars '@ISA', '$VERSION';
 use Image::Base;
 @ISA = ('Image::Base');
 
-$VERSION = 12;
+$VERSION = 13;
 
 # uncomment this to run the ### lines
 #use Devel::Comments '###';
@@ -189,23 +189,31 @@ sub set {
   %$self = (%$self, %params);
 }
 
+#------------------------------------------------------------------------------
+# drawing
+
 sub xy {
   my ($self, $x, $y, $colour) = @_;
   ### xy
   ### $x
   ### $y
   ### $colour
+
+  unless ($x >= 0 && $y >= 0 && $x <= 32767 && $y <= 32767) {
+    ### outside max drawable, don't overflow INT16 ...
+    return undef; # fetch or store
+  }
+
   my $X = $self->{'-X'};
   my $drawable = $self->{'-drawable'};
   if (@_ == 4) {
-    if ($x >= 0 && $y >= 0
-        && $x <= 32767 && $y <= 32767) {  # don't overflow INT16 request
-      $X->PolyPoint ($drawable, _gc_colour($self,$colour),
-                     'Origin', $x,$y);
-    }
+    # store colour
+    $X->PolyPoint ($drawable, _gc_colour($self,$colour),
+                   'Origin', $x,$y);
     return;
   }
 
+  # fetch colour
   my @reply = $X->robust_req ('GetImage', $drawable,
                               $x, $y, 1, 1, 0xFFFFFFFF, 'ZPixmap');
   if (! ref $reply[0]) {
@@ -254,62 +262,88 @@ sub Image_Base_Other_xy_points {
   my $gc = _gc_colour($self,$colour);
   my $X = $self->{'-X'};
 
-  # PolyPoint is 3xCARD32 drawable,gc,mode then room for maxlen-3 words of
-  # X,Y values.  X and Y are INT16 each, hence room for (maxlen-3)*2
-  # individual points.  Is there any value sending somewhat smaller chunks
-  # though?  250kbytes is a typical server limit.
+  # PolyPoint is 3xCARD32 for drawable,gc,mode then room for maxlen-3 words
+  # of X,Y values.  X and Y are INT16 each, hence room for (maxlen-3)*2
+  # individual points.  Is there any merit sending smaller chunks though?
+  # 250kbytes is a typical server limit.
   #
   my $maxpoints = 2*($X->{'maximum_request_length'} - 3);
   ### $maxpoints
 
-  while (@_ > $maxpoints) {
-    ### splice down from: scalar(@_)
-    $X->PolyPoint ($self->{'-drawable'}, $gc, 'Origin',
-                   splice @_, 0,$maxpoints);
+  my @points;
+  while (@_) {
+    if (@points >= $maxpoints) {
+      $X->PolyPoint ($self->{'-drawable'}, $gc, 'Origin', @points);
+      $#points = -1; # empty
+    }
+    my $x = shift;
+    my $y = shift;
+    if ($x >= 0 && $y >= 0 && $x <= 32767 && $y <= 32767) {
+      # within max drawable ...
+      push @points, $x,$y;
+    }
   }
-  ### PolyPoint: scalar(@_)
-  $X->PolyPoint ($self->{'-drawable'}, $gc, 'Origin', @_);
-}
-
-# not yet a documented feature ...
-sub pixel_to_colour {
-  my ($self,$pixel) = @_;
-  my $hash = ($self->{'-pixel_to_colour'} ||= do {
-    ### colour_to_pixel hash: $self->{'-colour_to_pixel'}
-    ({ reverse %{$self->{'-colour_to_pixel'}} }) # force anon hash
-  });
-  return $hash->{$pixel};
+  if (@points) {
+    $X->PolyPoint ($self->{'-drawable'}, $gc, 'Origin', @points);
+  }
 }
 
 sub line {
-  my ($self, $x0, $y0, $x1, $y1, $colour) = @_ ;
+  my ($self, $x1, $y1, $x2, $y2, $colour) = @_ ;
+
+  if (($x1 < 0 && $x2 < 0)
+      || ($y1 < 0 && $y2 < 0)
+      || ($x1 > 32767 && $x2 > 32767)
+      || ($y1 > 32767 && $y2 > 32767)) {
+    ### entirely outside max possible drawable ...
+    return;
+  }
+  if ($x1 < -32768 || $x2 < -32768
+      || $x1 > 32767 || $x2 > 32767
+      || $y1 < -32768 || $y2 < -32768
+      || $y1 > 32767 || $y2 > 32767) {
+    # ENHANCE-ME: line_clipper() to 2^15 boundaries might be close enough
+    ### coordinates would overflow, use superclass ...
+    shift->SUPER::line(@_);
+    return;
+  }
+
   $self->{'-X'}->PolySegment ($self->{'-drawable'}, _gc_colour($self,$colour),
-                              $x0,$y0, $x1,$y1);
+                              $x1,$y1, $x2,$y2);
 }
 
 sub rectangle {
   my ($self, $x1, $y1, $x2, $y2, $colour, $fill) = @_;
   ### X11-Protocol-Drawable rectangle
-  if ($x2 >= 0 && $y2 >= 0 && $x1 <= 32767 && $y1 <= 32767) {
-    if ($x1 < 0) { $x1 = 0; } # don't underflow INT16 -32768 in request
-    if ($y1 < 0) { $y1 = 0; }
-    if ($x2 > 32767) { $x2 = 32767; } # don't overflow INT16 request
-    if ($y2 > 32767) { $y2 = 32767; }
 
-    if ($x1 == $x2 || $y1 == $y2) {
-      # single pixel wide or high, must PolyFillRectangle treat as filled
-      # since PolyRectangle draws nothing if passed width==0 or height==0
-      $fill = 1;
-    } else {
-      $fill = !!$fill;  # 0 or 1 for addition below
-    }
-    ### coords: [ $x1, $y1, $x2-$x1, $y2-$y1 ]
-
-    $self->{'-X'}->request (($fill ? 'PolyFillRectangle' : 'PolyRectangle'),
-                            $self->{'-drawable'},
-                            _gc_colour($self,$colour),
-                            [ $x1, $y1, $x2-$x1+$fill, $y2-$y1+$fill ]);
+  unless ($x2 >= 0 && $y2 >= 0 && $x1 <= 32767 && $y1 <= 32767) {
+    ### entirely outside max possible drawable ...
+    return;
   }
+
+  # don't underflow INT16 -32768 x,y in request
+  # but retain negativeness so as not to bring unfilled sides into view
+  if ($x1 < -1) { $x1 = -1; }
+  if ($y1 < -1) { $y1 = -1; }
+
+  # don't overflow CARD16 width,height in request
+  # this doesn't bring the unfilled side into view
+  if ($x2 > 32767) { $x2 = 32767; }
+  if ($y2 > 32767) { $y2 = 32767; }
+
+  if ($x1 == $x2 || $y1 == $y2) {
+    # single pixel wide or high, must treat as filled since PolyRectangle()
+    # draws nothing if passed width==0 or height==0
+    $fill = 1;
+  } else {
+    $fill = !!$fill;  # 0 or 1 for arithmetic
+  }
+  ### coords: [ $x1, $y1, $x2-$x1, $y2-$y1 ]
+
+  $self->{'-X'}->request (($fill ? 'PolyFillRectangle' : 'PolyRectangle'),
+                          $self->{'-drawable'},
+                          _gc_colour($self,$colour),
+                          [ $x1, $y1, $x2-$x1+$fill, $y2-$y1+$fill ]);
 }
 
 sub Image_Base_Other_rectangles {
@@ -324,10 +358,24 @@ sub Image_Base_Other_rectangles {
 
   ### coords count: scalar(@_)
   ### coords: @_
+
   my @rects;
   my @filled;
   while (my ($x1,$y1, $x2,$y2) = splice @_,0,4) {
     ### quad: ($x1,$y1, $x2,$y2)
+
+    unless ($x2 >= 0 && $y2 >= 0 && $x1 <= 32767 && $y1 <= 32767) {
+      ### entirely outside max possible drawable ...
+      next;
+    }
+    # don't underflow INT16 -32768 x,y in request
+    # but retain negativeness so as not to bring unfilled sides into view
+    if ($x1 < -1) { $x1 = -1; }
+    if ($y1 < -1) { $y1 = -1; }
+    # don't overflow CARD16 width,height in request
+    if ($x2 > 32767) { $x2 = 32767; }
+    if ($y2 > 32767) { $y2 = 32767; }
+
     if (! $fill && ($x1 == $x2 || $y1 == $y2)) {
       # single pixel wide or high
       push @filled, [ $x1, $y1, $x2-$x1+1, $y2-$y1+1 ];
@@ -400,38 +448,61 @@ sub Image_Base_Other_rectangles {
 sub ellipse {
   my ($self, $x1, $y1, $x2, $y2, $colour, $fill) = @_;
   ### Drawable ellipse(): $x1, $y1, $x2, $y2, $colour
+
   my $w = $x2 - $x1;
   my $h = $y2 - $y1;
   if ($w <= 1 || $h <= 1) {
     # 1 or 2 pixels wide or high
     shift->rectangle(@_);
-  } else {
-    ### PolyArc: $x1, $y1, $x2-$x1+1, $y2-$y1+1, 0, 360*64
-    my @args = ($self->{'-drawable'}, _gc_colour($self,$colour),
-                [ $x1, $y1, $w, $h, 0, 360*64 ]);
-    my $X = $self->{'-X'};
-    if ($fill) {
-      $X->PolyFillArc (@args);
-    }
-    $X->PolyArc (@args);
+    return;
   }
+
+  unless ($x2 >= 0 && $y2 >= 0 && $x1 <= 32767 && $y1 <= 32767) {
+    ### entirely outside max possible drawable ...
+    return;
+  }
+
+  if ($x1 < -32768 || $x2 > 32767 || $y1 < -32768 || $y2 > 32767) {
+    ### coordinates would overflow, use superclass ...
+    shift->SUPER::ellipse(@_);
+    return;
+  }
+
+  ### PolyArc: $x1, $y1, $x2-$x1+1, $y2-$y1+1, 0, 360*64
+  my @args = ($self->{'-drawable'}, _gc_colour($self,$colour),
+              [ $x1, $y1, $w, $h, 0, 360*64 ]);
+  my $X = $self->{'-X'};
+  if ($fill) {
+    $X->PolyFillArc (@args);
+  }
+  $X->PolyArc (@args);
 }
 
 sub diamond {
   my ($self, $x1, $y1, $x2, $y2, $colour, $fill) = @_;
   ### Drawable diamond(): $x1, $y1, $x2, $y2, $colour
 
+  if ($x1==$x2 && $y1==$y2) {
+    # 1x1 polygon draws nothing, do it as a point instead
+    $self->xy($x1,$y1, $colour);
+    return;
+  }
+
+  unless ($x2 >= 0 && $y2 >= 0 && $x1 <= 32767 && $y1 <= 32767) {
+    ### entirely outside max possible drawable ...
+    return;
+  }
+  if ($x1 < -32768 || $y1 < -32768 || $x2 > 32767 || $y2 > 32767) {
+    ### coordinates would overflow, use superclass ...
+    shift->SUPER::ellipse(@_);
+    return;
+  }
+
   my $X = $self->{'-X'};
   my $drawable = $self->{'-drawable'};
   my $gc = _gc_colour($self,$colour);
 
-  if ($x1==$x2 && $y1==$y2) {
-    # 1x1 polygon draws nothing, do it as a point instead
-    $X->PolyPoint ($drawable, $gc, 'Origin', $x1,$y1);
-
-  } else {
-    _diamond_drawable ($X, $drawable, $gc, $x1,$y1, $x2,$y2, $fill);
-  }
+  _diamond_drawable ($X, $drawable, $gc, $x1,$y1, $x2,$y2, $fill);
 }
 
 # shared by Image::Base::X11::Protocol::Window::diamond()
@@ -469,6 +540,18 @@ sub _diamond_drawable {
     $X->FillPoly ($drawable, $gc, 'Convex', @args);
   }
   $X->PolyLine ($drawable, $gc, @args);
+}
+
+#------------------------------------------------------------------------------
+
+# not yet a documented feature ...
+sub pixel_to_colour {
+  my ($self,$pixel) = @_;
+  my $hash = ($self->{'-pixel_to_colour'} ||= do {
+    ### colour_to_pixel hash: $self->{'-colour_to_pixel'}
+    ({ reverse %{$self->{'-colour_to_pixel'}} }) # force anon hash
+  });
+  return $hash->{$pixel};
 }
 
 # return a gc XID set to draw in $colour
@@ -627,8 +710,7 @@ sub add_colours {
 1;
 __END__
 
-=for stopwords undef Ryde pixmap pixmaps colormap ie XID GC PseudoColor lookups
-TrueColor RGB drawables gc
+=for stopwords undef Ryde pixmap pixmaps colormap ie XID GC PseudoColor lookups TrueColor RGB drawables gc subclasses Drawable drawable LRU
 
 =head1 NAME
 
@@ -691,6 +773,9 @@ hexadecimal RGB, and set/clear for bitmaps or monochrome windows,
 Colours used are allocated in a specified C<-colormap>.
 
 =head1 FUNCTIONS
+
+See L<Image::Base/FUNCTIONS> for the behaviour common to all Image-Base
+classes.
 
 =over 4
 
@@ -824,28 +909,28 @@ The plain drawing operations don't need the size.
 
 =head1 ALGORITHMS
 
-C<ellipse()> unfilled uses the X C<PolyArc> line centred on the boundary pixels,
-being the midpoints of the C<$y1> row, C<$y2> row, C<$x1> column, etc.  The
-way the pixel "centre within the shape" rule works should mean that circles
-are symmetric, but the X protocol spec allows the server some implementation
-dependent latitude for ellipses with width!=height.
+C<ellipse()> unfilled uses the X C<PolyArc> line centred on the boundary
+pixels, being the midpoints of the C<$y1> row, C<$y2> row, C<$x1> column,
+etc.  The way the pixel "centre within the shape" rule works should mean
+that circles are symmetric, but the X protocol spec allows the server some
+implementation dependent latitude for ellipses width!=height.
 
-C<ellipse()> uses the X C<FillArc>, but that means the area inside an
+C<ellipse()> filled uses the X C<FillArc>, but that means the area inside an
 ellipse centred on the boundary pixels, which is effectively 1/2 pixel in
 from the ellipse line edge.  The pixel "centre on the boundary drawn if
 above or left" rule also means the bottom row and rightmost column aren't
 drawn at all.  The current strategy is to draw a C<PolyArc> on top for the
 extra 1/2 pixel radius.
 
-For a circle an alternative strategy would be to set the line width to half
-the radius and draw from half way in from the edges.  That means the line
-width is from the centre of the box to the outer edges.  The way a line has
-linewidth/2 each side makes a resolution of 1/2 pixel possible.  The
+For a filled circle an alternative strategy would be to set the line width
+to half the radius and draw from half way in from the edges.  That means the
+line width is from the centre of the box to the outer edges.  The way a line
+has linewidth/2 each side makes a resolution of 1/2 pixel possible.  The
 disadvantage would be changing the GC each time, which might be undesirable
 if it came from the user (secret as-yet undocumented C<-gc> attribute).
 Note also this is no good for an ellipse width!=height because if you draw a
 fixed distance tangent to an ellipse then it's not a bigger ellipse, but a
-shape a fatter than an ellipse.
+shape fatter than an ellipse.
 
 The C<FillArc> plus C<PolyArc> combination ends up drawing some pixels
 twice, which is no good for an "XOR" gc operation.  Currently that doesn't
@@ -882,7 +967,7 @@ http://user42.tuxfamily.org/image-base-x11-protocol/index.html
 
 =head1 LICENSE
 
-Image-Base-X11-Protocol is Copyright 2010, 2011 Kevin Ryde
+Image-Base-X11-Protocol is Copyright 2010, 2011, 2012 Kevin Ryde
 
 Image-Base-X11-Protocol is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License as published by

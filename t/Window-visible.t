@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# Copyright 2010, 2011 Kevin Ryde
+# Copyright 2010, 2011, 2012 Kevin Ryde
 
 # This file is part of Image-Base-X11-Protocol.
 #
@@ -24,11 +24,9 @@
 use 5.004;
 use strict;
 use Test;
-my $test_count;
-BEGIN {
-  $test_count = 6526;
-  plan tests => $test_count;
-}
+
+my $test_count = (tests => 6538)[1];
+plan tests => $test_count;
 
 use lib 't';
 use MyTestHelpers;
@@ -135,7 +133,7 @@ MyTestImageBase::check_image ($image);
 MyTestImageBase::check_diamond ($image);
 
 # 6526-3262=3264
-if (1||! $X->init_extension('SHAPE')) {
+if (! $X->init_extension('SHAPE')) {
   MyTestHelpers::diag ('SHAPE extension not available');
   foreach (1 .. 3264) {
     skip ('SHAPE extension not available', 1, 1);

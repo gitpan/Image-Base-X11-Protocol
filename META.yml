@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               Image-Base-X11-Protocol
-version:            12
+version:            13
 abstract:           Image::Base drawing into X windows and pixmaps using X11::Protocol.
 author:
     - Kevin Ryde <user42@zip.com.au>
@@ -23,27 +23,7 @@ no_index:
     directory:
         - t
         - inc
-        - xt
-        - devel
-        - examples
-generated_by:       ExtUtils::MakeMaker version 6.56
+generated_by:       ExtUtils::MakeMaker version 6.57_05
 meta-spec:
     url:      http://module-build.sourceforge.net/META-spec-v1.4.html
     version:  1.4
-optional_features:
-    maximum_devel:
-        description:  Stuff used variously for development.
-        requires:
-            File::Spec:          0
-            Parse::CPAN::Meta:   0
-            Pod::Simple::HTML:   0
-            Smart::Comments:     0
-            Test::DistManifest:  0
-            Test::Pod:           1.00
-            Test::Synopsis:      0
-            Test::YAML::Meta:    0.15
-            warnings::unused:    0
-            YAML:                0
-            YAML::Syck:          0
-            YAML::Tiny:          0
-            YAML::XS:            0

@@ -1,4 +1,4 @@
-# Copyright 2010, 2011 Kevin Ryde
+# Copyright 2010, 2011, 2012 Kevin Ryde
 
 # This file is part of Image-Base-X11-Protocol.
 #
@@ -30,10 +30,8 @@ use vars '@ISA', '$VERSION';
 use Image::Base::X11::Protocol::Drawable;
 @ISA = ('Image::Base::X11::Protocol::Drawable');
 
-$VERSION = 12;
+$VERSION = 13;
 
-# uncomment this to run the ### lines
-#use Devel::Comments;
 
 sub new {
   my ($class, %params) = @_;
@@ -112,10 +110,20 @@ sub set {
   }
 }
 
+#------------------------------------------------------------------------------
+# drawing
+
 sub xy {
   my ($self, $x, $y, $colour) = @_;
   ### Window xy(): "$x, $y".(@_>=4 && ", $colour")
   if ((my $X = $self->{'-X'}) ->{'ext'}->{'SHAPE'}) {
+
+    # don't overflow INT16 in requests
+    unless ($x >= 0 && $y >= 0 && $x <= 32767 && $y <= 32767) {
+      ### entirely outside max possible drawable ...
+      return undef; # fetch or store
+    }
+
     if (@_ >= 4) {
       if ($colour eq 'None') {
         ### Window xy() subtract shape ...
@@ -163,10 +171,31 @@ sub line {
 
   if ($colour eq 'None'
       && (my $X = $self->{'-X'}) ->{'ext'}->{'SHAPE'}) {
+
+    if (($x1 < 0 && $x2 < 0)
+        || ($y1 < 0 && $y2 < 0)
+        || ($x1 > 32767 && $x2 > 32767)
+        || ($y1 > 32767 && $y2 > 32767)) {
+      ### entirely outside max possible drawable ...
+      return;
+    }
+    my $bitmap_width = abs($x2-$x1)+1;
+    my $bitmap_height = abs($y2-$y1)+1;
+    if ($bitmap_width > 32767 || $bitmap_height > 32767
+        || $x1 < -32768 || $x2 < -32768
+        || $x1 > 32767 || $x2 > 32767
+        || $y1 < -32768 || $y2 < -32768
+        || $y1 > 32767 || $y2 > 32767) {
+      ### coordinates would overflow, use superclass ...
+      shift->SUPER::line(@_);
+      return;
+    }
+
+    my ($bitmap, $bitmap_gc) = _make_bitmap_and_gc
+      ($self, $bitmap_width , $bitmap_height);
+
     my $xmin = ($x1 < $x2 ? $x1 : $x2);
     my $ymin = ($y1 < $y2 ? $y1 : $y2);
-    my ($bitmap, $bitmap_gc) = _make_bitmap_and_gc
-      ($self, abs($x2-$x1)+1, abs($y2-$y1)+1);   # width,height
     $X->PolySegment ($bitmap, $bitmap_gc,
                      $x1-$xmin,$y1-$ymin, $x2-$xmin,$y2-$ymin);
     $X->ShapeMask ($self->{'-drawable'},
@@ -185,15 +214,31 @@ sub rectangle {
   ### Window rectangle: $x1, $y1, $x2, $y2, $colour, $fill
   if ($colour eq 'None'
       && (my $X = $self->{'-X'}) ->{'ext'}->{'SHAPE'}) {
+
+    unless ($x2 >= 0 && $y2 >= 0 && $x1 <= 32767 && $y1 <= 32767) {
+      ### entirely outside max possible drawable ...
+      return;
+    }
+
+    # don't underflow INT16 -32768 x,y in request
+    # retain negativeness so as not to bring unfilled sides into view
+    if ($x1 < -1) { $x1 = -1; }
+    if ($y1 < -1) { $y1 = -1; }
+
+    # don't overflow CARD16 width,height in request
+    if ($x2 > 32767) { $x2 = 32767; }
+    if ($y2 > 32767) { $y2 = 32767; }
+
     my @rects;
     my $width = $x2 - $x1 + 1;
     my $height = $y2 - $y1 + 1;
     if ($fill
         || $width <= 2
         || $height <= 2) {
-      # filled, or unfilled 2xN or Nx2, as one rectangle
+      # filled, or unfilled 2xN or Nx2 as one rectangle
       @rects = ([ $x1, $y1, $width, $height ]);
     } else {
+      # unfilled, line segments
       @rects = ([ $x1, $y1,   $width, 1    ],  # top
                 [ $x1,$y1+1,  1, $height-2 ],  # left
                 [ $x2,$y1+1,  1, $height-2 ],  # right
@@ -238,7 +283,18 @@ sub ellipse {
   ### Window ellipse(): $x1,$y1, $x2,$y2, $colour
   if ($colour eq 'None'
       && (my $X = $self->{'-X'}) ->{'ext'}->{'SHAPE'}) {
-    ### use shape
+    ### use shape ...
+
+    unless ($x2 >= 0 && $y2 >= 0 && $x1 <= 32767 && $y1 <= 32767) {
+      ### entirely outside max possible drawable ...
+      return;
+    }
+    if ($x1 < -32768 || $x2 > 32767 || $y1 < -32768 || $y2 > 32767) {
+      ### coordinates would overflow, use superclass ...
+      shift->SUPER::ellipse(@_);
+      return;
+    }
+
     my $win = $self->{'-drawable'};
     my $w = $x2 - $x1;
     my $h = $y2 - $y1;
@@ -250,7 +306,8 @@ sub ellipse {
                            'YXBanded',
                            [ $x1, $y1, $w+1, $h+1 ]);
     } else {
-      my ($bitmap, $bitmap_gc) = _make_bitmap_and_gc ($self, $w, $h);
+      my ($bitmap, $bitmap_gc) = _make_bitmap_and_gc ($self, $w+1, $h+1);
+
       # fill+outline per comments in Drawable.pm
       my @args = ($bitmap, $bitmap_gc, [ 0, 0, $w, $h, 0, 365*64 ]);
       if ($fill) {
@@ -275,12 +332,23 @@ sub diamond {
   ### Window diamond(): $x1,$y1, $x2,$y2, $colour
   if ($colour eq 'None'
       && (my $X = $self->{'-X'}) ->{'ext'}->{'SHAPE'}) {
-    ### use shape
-    my $win = $self->{'-drawable'};
+    ### use shape ...
+
+    unless ($x2 >= 0 && $y2 >= 0 && $x1 <= 32767 && $y1 <= 32767) {
+      ### entirely outside max possible drawable ...
+      return;
+    }
+    if ($x1 < -32768 || $x2 > 32767 || $y1 < -32768 || $y2 > 32767) {
+      ### coordinates would overflow, use superclass ...
+      shift->SUPER::diamond(@_);
+      return;
+    }
+
+    my $drawable = $self->{'-drawable'};
 
     if ($x1==$x2 && $y1==$y2) {
       # 1x1 polygon draws nothing, do it as a point instead
-      $X->ShapeRectangles ($self->{'-drawable'},
+      $X->ShapeRectangles ($drawable,
                            'Bounding',
                            'Subtract',
                            0,0, # offset
@@ -294,7 +362,7 @@ sub diamond {
         = _make_bitmap_and_gc ($self, $x2+1, $y2+1);  # width,height
       Image::Base::X11::Protocol::Drawable::_diamond_drawable
           ($X, $bitmap, $bitmap_gc, 0,0, $x2,$y2, $fill);
-      $X->ShapeMask ($self->{'-drawable'},
+      $X->ShapeMask ($drawable,
                      'Bounding',
                      'Subtract',
                      $x1,$y1,     # offset
@@ -344,7 +412,7 @@ __END__
 #   });
 # }
 
-=for stopwords undef Ryde colormap ie resizes XID
+=for stopwords undef Ryde colormap ie resizes XID subclasses superclasses Drawable resizing
 
 =head1 NAME
 
@@ -381,11 +449,14 @@ There's no file load or save, just drawing operations.
 
 As an experimental feature, if the C<X11::Protocol> object has the SHAPE
 extension available and initialized then colour "None" means transparent and
-drawing it subtracts from the window's shape, making see-though holes.  This
+drawing it subtracts from the window's shape to make see-though holes.  This
 is fun, and makes "None" more or less work like other C<Image::Base>
-subclasses, but is perhaps of marginal actual use.
+subclasses, but is probably not actually very useful.
 
 =head1 FUNCTIONS
+
+See L<Image::Base::X11::Protocol::Drawable/FUNCTIONS> and
+L<Image::Base/FUNCTIONS> for behaviour inherited from the superclasses.
 
 =over 4
 
@@ -402,8 +473,8 @@ C<-colormap> is set from the window's current colormap attribute, or pass a
 value to save a server round-trip if you know it already or if you want a
 different colormap.
 
-There's nothing to create a new X window since there's lots of settings for
-it and they seem outside the scope of this image wrapper.
+There's nothing to create a new X window since there's many settings for it
+and they seem outside the scope of this wrapper.
 
 =back
 
@@ -419,22 +490,22 @@ The target window.  C<-drawable> and C<-window> access the same attribute.
 
 =item C<-height> (integer)
 
-Changing these resizes the window (C<ConfigureWindow>).  See the base
+Changing these resizes the window per C<ConfigureWindow>.  See the base
 Drawable class for the way fetching uses C<GetGeometry>.
 
-The maximum size allowed by the protocol is 32767x32767, and minimum 1x1.
-When creating or resizing currently the sizes end up chopped by Perl's
-C<pack> to a signed 16 bits, which means 32768 to 65535 results in an X
-protocol error (being negatives), but for instance 65546 wraps around to 10
-and will seem to work.
+The maximum size allowed by the protocol in various places is 32767x32767,
+and the minimum is 1x1.  When creating or resizing currently the sizes end
+up chopped by Perl's C<pack> to a signed 16 bits, which means 32768 to 65535
+results in an X protocol error (being negatives), but for instance 65546
+wraps around to 10 and will seem to work.
 
 In the current code a window size change made outside this wrapper
 (including perhaps by the user through the window manager) is not noticed by
 the wrapper and C<-width> and C<-height> remain as the cached values.
-A C<GetGeometry> for every C<get> would be the only way to be sure of the
-right values, but a server query every time would likely be very slow for
-generic image code designed for in-memory images, and of course most of the
-time the window size doesn't change.
+A C<GetGeometry> for every C<get()> would be the only way to be sure of
+the right values, but a server query every time would likely be very slow
+for generic image code designed for in-memory images, and of course most of
+the time the window size doesn't change.
 
 =item C<-colormap> (integer XID)
 
@@ -458,7 +529,7 @@ http://user42.tuxfamily.org/image-base-x11-protocol/index.html
 
 =head1 LICENSE
 
-Image-Base-X11-Protocol is Copyright 2010, 2011 Kevin Ryde
+Image-Base-X11-Protocol is Copyright 2010, 2011, 2012 Kevin Ryde
 
 Image-Base-X11-Protocol is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License as published by

@@ -12,8 +12,6 @@ devel/seq-wrap.pl
 devel/x11-protocol.pl
 devel/xwd.pl
 examples/view-xbm.pl
-inc/my_pod2html
-inc/MyMakeMakerExtras.pm
 lib/Image/Base/X11/Protocol/Drawable.pm
 lib/Image/Base/X11/Protocol/Pixmap.pm
 lib/Image/Base/X11/Protocol/Window.pm
@@ -37,4 +35,14 @@ xt/0-Test-DistManifest.t
 xt/0-Test-Pod.t
 xt/0-Test-Synopsis.t
 xt/0-Test-YAML-Meta.t
+xtools/my-check-copyright-years.sh
+xtools/my-check-file-part-of.sh
+xtools/my-check-spelling.sh
+xtools/my-deb.sh
+xtools/my-diff-prev.sh
+xtools/my-kwalitee.sh
+xtools/my-manifest.sh
+xtools/my-pc.sh
+xtools/my-tags.sh
+xtools/my-wunused.sh
 META.yml                                 Module meta-data (added by MakeMaker)

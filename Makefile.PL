@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# Copyright 2010, 2011 Kevin Ryde
+# Copyright 2010, 2011, 2012 Kevin Ryde
 
 # This file is part of Image-Base-X11-Protocol.
 #
@@ -20,10 +20,8 @@
 use 5.004;
 use strict;
 use ExtUtils::MakeMaker;
-use lib 'inc';
-use MyMakeMakerExtras;
 
-MyMakeMakerExtras::WriteMakefile
+WriteMakefile
   (NAME         => 'Image-Base-X11-Protocol',
    ABSTRACT     => 'Image::Base drawing into X windows and pixmaps using X11::Protocol.',
    VERSION_FROM => 'lib/Image/Base/X11/Protocol/Drawable.pm',
@@ -50,12 +48,6 @@ MyMakeMakerExtras::WriteMakefile
    META_MERGE =>
    { resources =>
      { homepage => 'http://user42.tuxfamily.org/image-base-x11-protocol/index.html',
-     },
-     optional_features =>
-     { maximum_devel =>
-       { description => 'Stuff used variously for development.',
-         requires => { 'Smart::Comments'     => 0,
-                     },
-       },
+       license  => 'http://www.gnu.org/licenses/gpl.html',
      },
    });

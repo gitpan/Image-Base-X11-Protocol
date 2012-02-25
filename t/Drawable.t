@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# Copyright 2010, 2011 Kevin Ryde
+# Copyright 2010, 2011, 2012 Kevin Ryde
 
 # This file is part of Image-Base-X11-Protocol.
 #
@@ -26,7 +26,7 @@ use lib 't';
 use MyTestHelpers;
 BEGIN { MyTestHelpers::nowarnings() }
 
-my $test_count = 6056;
+my $test_count = (tests => 6068)[1];
 plan tests => $test_count;
 
 my $display = $ENV{'DISPLAY'};
@@ -64,7 +64,7 @@ my $X_screen_number = MyTestHelpers::X11_chosen_screen_number($X);
 #------------------------------------------------------------------------------
 # VERSION
 
-my $want_version = 12;
+my $want_version = 13;
 ok ($Image::Base::X11::Protocol::Drawable::VERSION,
     $want_version, 'VERSION variable');
 ok (Image::Base::X11::Protocol::Drawable->VERSION,
