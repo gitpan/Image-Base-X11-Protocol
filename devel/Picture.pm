@@ -1,4 +1,4 @@
-# Copyright 2010, 2011, 2012 Kevin Ryde
+# Copyright 2010, 2011, 2012, 2013 Kevin Ryde
 
 # This file is part of Image-Base-X11-Protocol.
 #
@@ -33,7 +33,7 @@ use vars '@ISA', '$VERSION';
 use Image::Base;
 @ISA = ('Image::Base');
 
-$VERSION = 13;
+$VERSION = 14;
 
 # uncomment this to run the ### lines
 #use Devel::Comments '###';
@@ -75,7 +75,7 @@ sub xy {
   my $picture = $self->{'-picture'};
   if (@_ == 4) {
     if ($x >= 0 && $y >= 0
-        && $x <= 32767 && $y <= 32767) {  # don't overflow INT16 request
+        && $x <= 0x7FFF && $y <= 0x7FFF) {  # don't overflow INT16 request
       $self->{'-X'}->RenderFillRectangles
         ('Src', $self->{'-picture'},
          $self->colour_to_rgbaref($colour),
@@ -122,16 +122,16 @@ sub rectangle {
 
   # clip to 0 .. 2^15-1 possible maximum drawable, no need to find out the
   # actual size
-  ($x2 >= 0 && $y2 >= 0 && $x1 <= 32767 && $y1 <= 32767)
+  ($x2 >= 0 && $y2 >= 0 && $x1 <= 0x7FFF && $y1 <= 0x7FFF)
     or return;
 
-  # don't underflow INT16 -32768 x,y in request
+  # don't underflow INT16 -0x8000 x,y in request
   if ($x1 < 0) { $x1 = 0; }
   if ($y1 < 0) { $y1 = 0; }
 
   # don't overflow CARD16 width,height in request
-  if ($x2 > 32767) { $x2 = 32767; }
-  if ($y2 > 32767) { $y2 = 32767; }
+  if ($x2 > 0x7FFF) { $x2 = 0x7FFF; }
+  if ($y2 > 0x7FFF) { $y2 = 0x7FFF; }
 
   my @rects;
   if (! $fill && $y2-$y1 >= 2) {

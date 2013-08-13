@@ -1,4 +1,4 @@
-# Copyright 2010, 2011, 2012 Kevin Ryde
+# Copyright 2010, 2011, 2012, 2013 Kevin Ryde
 
 # This file is part of Image-Base-X11-Protocol.
 #
@@ -26,7 +26,7 @@ use vars '@ISA', '$VERSION';
 use Image::Base::X11::Protocol::Drawable;
 @ISA = ('Image::Base::X11::Protocol::Drawable');
 
-$VERSION = 13;
+$VERSION = 14;
 
 # uncomment this to run the ### lines
 #use Smart::Comments;
@@ -237,7 +237,7 @@ http://user42.tuxfamily.org/image-base-x11-protocol/index.html
 
 =head1 LICENSE
 
-Image-Base-X11-Protocol is Copyright 2010, 2011, 2012 Kevin Ryde
+Image-Base-X11-Protocol is Copyright 2010, 2011, 2012, 2013 Kevin Ryde
 
 Image-Base-X11-Protocol is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License as published by

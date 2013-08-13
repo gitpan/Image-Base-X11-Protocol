@@ -1,4 +1,4 @@
-# Copyright 2010, 2011 Kevin Ryde
+# Copyright 2010, 2011, 2012, 2013 Kevin Ryde
 #
 # This file is part of Image-Base-X11-Protocol.
 #
@@ -20,7 +20,7 @@ Section: perl
 Priority: optional
 Build-Depends: libtest-perl | perl (>= 5.004.05), cdbs, debhelper (>= 5)
 Maintainer: Kevin Ryde <user42@zip.com.au>
-Standards-Version: 3.9.2
+Standards-Version: 3.9.4
 Homepage: http://user42.tuxfamily.org/image-base-x11-protocol/index.html
 Bugs: mailto:user42@zip.com.au
 

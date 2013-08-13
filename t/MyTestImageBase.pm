@@ -33,11 +33,12 @@ $black = 'black';
 $skip = undef;
 $handle_input = sub {};
 
-# uncomment this to run the ### lines
-#use Devel::Comments;
-
 use vars '@CARP_NOT';
 @CARP_NOT = ('Test');
+
+# uncomment this to run the ### lines
+#use Smart::Comments;
+
 
 sub min {
   my $ret = shift;
@@ -315,30 +316,36 @@ my @sizes = ([0,0, 0,0],    # 1x1
 
 sub check_xy {
   my ($image, %options) = @_;
+  ### check_xy() ...
   my $big_fetch_expect = $options{'big_fetch_expect'};
 
-  my $big_negative = -2**16 + 2;
-  # exercise some negatives
-  $image->xy ($big_negative,0, $white);
-  $image->xy (0,$big_negative, $white);
-  $image->xy ($big_negative,$big_negative, $white);
-  is (scalar($image->xy($big_negative,$big_negative)), $big_fetch_expect,
-      'xy() negative fetch');
-  is (scalar($image->xy(0,$big_negative)), $big_fetch_expect,
-      'xy() negative fetch');
-  is (scalar($image->xy($big_negative,0)), $big_fetch_expect,
-      'xy() negative fetch');
-
-  my $big_positive = 2**16 + 2;
-  $image->xy ($big_positive,$big_positive, $white);
-  $image->xy (0,$big_positive, $white);
-  $image->xy ($big_positive,0, $white);
-  is (scalar($image->xy(0,$big_positive)), $big_fetch_expect,
-      'xy() big positive fetch');
-  is (scalar($image->xy($big_positive,0)), $big_fetch_expect,
-      'xy() big positive fetch');
-  is (scalar($image->xy($big_positive,$big_positive)), $big_fetch_expect,
-      'xy() big positive fetch');
+  {
+    my $big_negative = -2**16 + 2;
+    ### $big_negative
+    # exercise some negatives
+    $image->xy ($big_negative,0, $white);
+    $image->xy (0,$big_negative, $white);
+    $image->xy ($big_negative,$big_negative, $white);
+    is (scalar($image->xy($big_negative,$big_negative)), $big_fetch_expect,
+        'xy() negative fetch');
+    is (scalar($image->xy(0,$big_negative)), $big_fetch_expect,
+        'xy() negative fetch');
+    is (scalar($image->xy($big_negative,0)), $big_fetch_expect,
+        'xy() negative fetch');
+  }
+  {
+    my $big_positive = 2**16 + 2;
+    ### $big_positive
+    $image->xy ($big_positive,$big_positive, $white);
+    $image->xy (0,$big_positive, $white);
+    $image->xy ($big_positive,0, $white);
+    is (scalar($image->xy(0,$big_positive)), $big_fetch_expect,
+        'xy() big positive fetch');
+    is (scalar($image->xy($big_positive,0)), $big_fetch_expect,
+        'xy() big positive fetch');
+    is (scalar($image->xy($big_positive,$big_positive)), $big_fetch_expect,
+        'xy() big positive fetch');
+  }
 }
 
 sub check_line {

@@ -50,4 +50,5 @@ WriteMakefile
      { homepage => 'http://user42.tuxfamily.org/image-base-x11-protocol/index.html',
        license  => 'http://www.gnu.org/licenses/gpl.html',
      },
+     no_index => { directory=>['devel'] },
    });

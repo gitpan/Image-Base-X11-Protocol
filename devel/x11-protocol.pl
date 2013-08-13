@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# Copyright 2010, 2011, 2012 Kevin Ryde
+# Copyright 2010, 2011, 2012, 2013 Kevin Ryde
 
 # This file is part of Image-Base-X11-Protocol.
 #
@@ -29,6 +29,122 @@ use Smart::Comments;
 use lib 't';
 use MyTestImageBase;
 
+{
+  $ENV{'DISPLAY'} = ':0';
+  my $X = X11::Protocol->new;
+  $X->init_extension('SHAPE');
+  { local $,=' ', say keys %{$X->{'ext'}}; }
+
+  my $width = 20;
+  my $height = 10;
+
+  my $win = $X->new_rsrc;
+  $X->CreateWindow($win, $X->root,
+                   'InputOutput',
+                   $X->root_depth,
+                   'CopyFromParent',
+                   0,0,
+                   $width,$height,
+                   10,   # border
+                   background_pixel => $X->{'white_pixel'},
+                   override_redirect => 1,
+                   colormap => 'CopyFromParent',
+                  );
+  $X->MapWindow ($win);
+  ### attrs: $X->GetWindowAttributes ($win)
+  # $X->ClearArea ($win, 0,0,0,0);
+
+  my $image = Image::Base::X11::Protocol::Window->new
+    (-X => $X,
+     -window => $win);
+  $image->rectangle (0,0, $width-1,$height-1, 'light grey', 1);
+  $image->rectangle (2,2, 17,7, 'None', 1);
+
+  {
+    my ($ordering, @rects) = $X->ShapeGetRectangles ($win, 'Clip');
+    ### $ordering
+    ### @rects
+    my $contains = Image::Base::X11::Protocol::Window::_rects_contain_xy(0,0, @rects);
+    ### $contains
+  }
+
+  foreach my $y (0 .. $height+1) {
+    foreach my $x (0 .. $width+1) {
+      my $ret = _window_get_shape_pixel($X, $win, $x,$y);
+      print $ret;
+    }
+    print "\n";
+  }
+
+  $X->flush;
+  $X->handle_input;
+  sleep 10;
+  exit 0;
+
+
+  # No good.  The full set of shape region rectangles are copied to the
+  # destination, so no saving in ShapeGetRectangles.
+  #
+  # Return 1 if the pixel of $window at $x,$y is opaque or 0 if transparent
+  # due to the shape extension on $window.
+  sub _window_get_shape_pixel {
+    my ($X, $window, $x, $y) = @_;
+    my $tempwin = $X->new_rsrc;
+    $X->CreateWindow($tempwin,
+                     $window,          # parent
+                     'CopyFromParent', # class
+                     0,                # depth, copy from parent
+                     'CopyFromParent', # visual
+                     0,0,              # x,y
+                     1,1,
+                     0,                # border
+                     override_redirect => 1);
+    $X->ShapeCombine ($tempwin, 'Bounding', 'Set', -$x,-$y, $window, 'Bounding');
+    my ($ordering, @rects) = $X->ShapeGetRectangles ($tempwin,'Bounding');
+    $X->DestroyWindow ($tempwin);
+    ### @rects
+    return scalar(@rects);
+  }
+}
+{
+  use X11::CursorFont;
+  my $X = X11::Protocol->new(':0');
+  my $rootwin = $X->root;
+  my $cursor_name = 'crosshair';
+  my $cursor_glyph = $X11::CursorFont::CURSOR_GLYPH{$cursor_name};
+  $cursor_glyph = 32;
+  my $cursor_font = $X->new_rsrc;
+  $X->OpenFont ($cursor_font, "cursor"); # cursor font
+  my $cursor = $X->new_rsrc;
+  $X->CreateGlyphCursor ($cursor,
+                         $cursor_font,  # font
+                         $cursor_font,  # mask font
+                         $cursor_glyph,      # glyph
+                         $cursor_glyph + 1,  # and its mask
+                         0,0,0,                  # foreground, black
+                         0xFFFF,0xFFFF,0xFFFF);  # background, white
+  $X->CloseFont ($cursor_font);
+
+  ### $cursor_glyph
+  ### $cursor
+  $X->ChangeWindowAttributes($rootwin, cursor => $cursor);
+  # $X->ChangeWindowAttributes($rootwin, cursor => 'None');
+  $X->flush;
+  exit 0;
+}
+{
+  $ENV{'DISPLAY'} ||= ':0';
+  my $X = X11::Protocol->new;
+  my $rootwin = $X->root;
+  my $gc = $X->new_rsrc;
+  $X->CreateGC ($gc, $rootwin);
+  $X->QueryPointer($rootwin);  # sync
+  ### PolyLine ...
+  $X->PolyLine ($rootwin, $gc, 'Origin', 0);
+  ### QueryPointer ...
+  $X->QueryPointer($rootwin);  # sync
+  exit 0;
+}
 
 {
   $ENV{'DISPLAY'} ||= ':0';
@@ -37,8 +153,8 @@ use MyTestImageBase;
   my $rootwin = $X->{'root'};
   $X->QueryPointer($rootwin);  # sync
 
-  my $width = 32767;
-  my $height = 32767;
+  my $width = 0x7FFF;
+  my $height = 0x7FFF;
   my $image = Image::Base::X11::Protocol::Pixmap->new
     (-X      => $X,
      -width  => $width,
@@ -198,8 +314,8 @@ use MyTestImageBase;
   # my $win = $X->new_rsrc;
   # my $image = Image::Base::X11::Protocol::Pixmap->new
   #   (-X      => $X,
-  #    -width  => 32767 + 50,
-  #    -height => 32767 + 50,
+  #    -width  => 0x7FFF + 50,
+  #    -height => 0x7FFF + 50,
   #    -depth  => 1,
   #    # -for_drawable => $X->{'root'},
   #   );
@@ -216,7 +332,7 @@ use MyTestImageBase;
   ### $X
   my $rootwin = $X->{'root'};
 
-  my $w = 32768;
+  my $w = 0x8000;
   my $h = 20;
   my $pixmap = $X->new_rsrc;
   $X->CreatePixmap ($pixmap,

@@ -1,4 +1,4 @@
-# Copyright 2010, 2011, 2012 Kevin Ryde
+# Copyright 2010, 2011, 2012, 2013 Kevin Ryde
 
 # This file is part of Image-Base-X11-Protocol.
 #
@@ -30,7 +30,10 @@ use vars '@ISA', '$VERSION';
 use Image::Base::X11::Protocol::Drawable;
 @ISA = ('Image::Base::X11::Protocol::Drawable');
 
-$VERSION = 13;
+# uncomment this to run the ### lines
+# use Smart::Comments;
+
+$VERSION = 14;
 
 
 sub new {
@@ -116,10 +119,11 @@ sub set {
 sub xy {
   my ($self, $x, $y, $colour) = @_;
   ### Window xy(): "$x, $y".(@_>=4 && ", $colour")
-  if ((my $X = $self->{'-X'}) ->{'ext'}->{'SHAPE'}) {
+
+  if ((my $X = $self->{'-X'})->{'ext'}->{'SHAPE'}) {
 
     # don't overflow INT16 in requests
-    unless ($x >= 0 && $y >= 0 && $x <= 32767 && $y <= 32767) {
+    if ($x < 0 || $y < 0 || $x > 0x7FFF || $y > 0x7FFF) {
       ### entirely outside max possible drawable ...
       return undef; # fetch or store
     }
@@ -133,6 +137,7 @@ sub xy {
                              0,0, # offset
                              'YXBanded',
                              [ $x,$y, 1,1 ]);
+        return;
       }
     } else {
       ### Window xy() fetch shape ...
@@ -147,24 +152,6 @@ sub xy {
   shift->SUPER::xy (@_);
 }
 
-# for any order except Unsorted could stop searching when $ry > $y, if
-# seemed worth extra code
-sub _rects_contain_xy {
-  ### _rects_contain_xy() ...
-  my $x = shift;
-  my $y = shift;
-  while (@_) {
-    my ($rx,$ry,$width,$height) = @{(shift)};
-    if ($rx <= $x && $rx+$width > $x
-        && $ry <= $y && $ry+$height > $y) {
-      ### found: "$x,$y  in  $rx,$ry, $width,$height"
-      return 1;
-    }
-  }
-  ### not found ...
-  return 0;
-}
-
 sub line {
   my ($self, $x1,$y1, $x2,$y2, $colour) = @_;
   ### X11-Protocol-Window line(): $x1,$y1, $x2,$y2, $colour
@@ -172,20 +159,17 @@ sub line {
   if ($colour eq 'None'
       && (my $X = $self->{'-X'}) ->{'ext'}->{'SHAPE'}) {
 
-    if (($x1 < 0 && $x2 < 0)
-        || ($y1 < 0 && $y2 < 0)
-        || ($x1 > 32767 && $x2 > 32767)
-        || ($y1 > 32767 && $y2 > 32767)) {
-      ### entirely outside max possible drawable ...
+    unless (Image::Base::X11::Protocol::Drawable::_line_any_positive($x1,$y1, $x2,$y2)) {
+      ### nothing positive ...
       return;
     }
     my $bitmap_width = abs($x2-$x1)+1;
     my $bitmap_height = abs($y2-$y1)+1;
-    if ($bitmap_width > 32767 || $bitmap_height > 32767
-        || $x1 < -32768 || $x2 < -32768
-        || $x1 > 32767 || $x2 > 32767
-        || $y1 < -32768 || $y2 < -32768
-        || $y1 > 32767 || $y2 > 32767) {
+    if ($bitmap_width > 0x7FFF || $bitmap_height > 0x7FFF
+        || $x1 < -0x8000 || $x2 < -0x8000
+        || $x1 > 0x7FFF || $x2 > 0x7FFF
+        || $y1 < -0x8000 || $y2 < -0x8000
+        || $y1 > 0x7FFF || $y2 > 0x7FFF) {
       ### coordinates would overflow, use superclass ...
       shift->SUPER::line(@_);
       return;
@@ -215,19 +199,19 @@ sub rectangle {
   if ($colour eq 'None'
       && (my $X = $self->{'-X'}) ->{'ext'}->{'SHAPE'}) {
 
-    unless ($x2 >= 0 && $y2 >= 0 && $x1 <= 32767 && $y1 <= 32767) {
+    unless ($x2 >= 0 && $y2 >= 0 && $x1 <= 0x7FFF && $y1 <= 0x7FFF) {
       ### entirely outside max possible drawable ...
       return;
     }
 
-    # don't underflow INT16 -32768 x,y in request
+    # don't underflow INT16 -0x8000 x,y in request
     # retain negativeness so as not to bring unfilled sides into view
     if ($x1 < -1) { $x1 = -1; }
     if ($y1 < -1) { $y1 = -1; }
 
     # don't overflow CARD16 width,height in request
-    if ($x2 > 32767) { $x2 = 32767; }
-    if ($y2 > 32767) { $y2 = 32767; }
+    if ($x2 > 0x7FFF) { $x2 = 0x7FFF; }
+    if ($y2 > 0x7FFF) { $y2 = 0x7FFF; }
 
     my @rects;
     my $width = $x2 - $x1 + 1;
@@ -249,17 +233,6 @@ sub rectangle {
                          'Subtract',
                          0,0, # offset
                          'YXBanded', @rects);
-
-    # my ($bitmap, $bitmap_gc) = _make_bitmap_and_gc ($self, $width, $height);
-    # $X->PolyRectangle ($bitmap,
-    #                    $bitmap_gc,
-    #                    [ 0,0, $width-1, $height-1 ]);
-    # $X->ShapeMask ($self->{'-drawable'},
-    #                'Bounding',
-    #                'Subtract',
-    #                $x1,$y1, # offset
-    #                $bitmap);
-    # $X->FreePixmap ($bitmap);
 
   } else {
     $self->SUPER::rectangle ($x1, $y1, $x2, $y2, $colour, $fill);
@@ -285,11 +258,11 @@ sub ellipse {
       && (my $X = $self->{'-X'}) ->{'ext'}->{'SHAPE'}) {
     ### use shape ...
 
-    unless ($x2 >= 0 && $y2 >= 0 && $x1 <= 32767 && $y1 <= 32767) {
+    unless ($x2 >= 0 && $y2 >= 0 && $x1 <= 0x7FFF && $y1 <= 0x7FFF) {
       ### entirely outside max possible drawable ...
       return;
     }
-    if ($x1 < -32768 || $x2 > 32767 || $y1 < -32768 || $y2 > 32767) {
+    if ($x1 < -0x8000 || $x2 > 0x7FFF || $y1 < -0x8000 || $y2 > 0x7FFF) {
       ### coordinates would overflow, use superclass ...
       shift->SUPER::ellipse(@_);
       return;
@@ -330,15 +303,22 @@ sub ellipse {
 sub diamond {
   my ($self, $x1,$y1, $x2,$y2, $colour, $fill) = @_;
   ### Window diamond(): $x1,$y1, $x2,$y2, $colour
+
   if ($colour eq 'None'
       && (my $X = $self->{'-X'}) ->{'ext'}->{'SHAPE'}) {
     ### use shape ...
 
-    unless ($x2 >= 0 && $y2 >= 0 && $x1 <= 32767 && $y1 <= 32767) {
+    if ($x1==$x2 && $y1==$y2) {
+      # 1x1 polygon draws nothing, do it as a point instead
+      $self->xy ($x1,$y1, $colour);
+      return;
+    }
+
+    unless ($x2 >= 0 && $y2 >= 0 && $x1 <= 0x7FFF && $y1 <= 0x7FFF) {
       ### entirely outside max possible drawable ...
       return;
     }
-    if ($x1 < -32768 || $x2 > 32767 || $y1 < -32768 || $y2 > 32767) {
+    if ($x1 < -0x8000 || $x2 > 0x7FFF || $y1 < -0x8000 || $y2 > 0x7FFF) {
       ### coordinates would overflow, use superclass ...
       shift->SUPER::diamond(@_);
       return;
@@ -346,34 +326,25 @@ sub diamond {
 
     my $drawable = $self->{'-drawable'};
 
-    if ($x1==$x2 && $y1==$y2) {
-      # 1x1 polygon draws nothing, do it as a point instead
-      $X->ShapeRectangles ($drawable,
-                           'Bounding',
-                           'Subtract',
-                           0,0, # offset
-                           'YXBanded',
-                           [ $x1,$y1, 1,1 ]);
+    $x2 -= $x1;   # offset so 0,0 to x2,y2
+    $y2 -= $y1;
+    my ($bitmap, $bitmap_gc)
+      = _make_bitmap_and_gc ($self, $x2+1, $y2+1);  # width,height
+    Image::Base::X11::Protocol::Drawable::_diamond_drawable
+        ($X, $bitmap, $bitmap_gc, 0,0, $x2,$y2, $fill);
+    $X->ShapeMask ($drawable,
+                   'Bounding',
+                   'Subtract',
+                   $x1,$y1,     # offset
+                   $bitmap);
+    $X->FreePixmap ($bitmap);
 
-    } else {
-      $x2 -= $x1;   # offset so 0,0 to x2,y2
-      $y2 -= $y1;
-      my ($bitmap, $bitmap_gc)
-        = _make_bitmap_and_gc ($self, $x2+1, $y2+1);  # width,height
-      Image::Base::X11::Protocol::Drawable::_diamond_drawable
-          ($X, $bitmap, $bitmap_gc, 0,0, $x2,$y2, $fill);
-      $X->ShapeMask ($drawable,
-                     'Bounding',
-                     'Subtract',
-                     $x1,$y1,     # offset
-                     $bitmap);
-      $X->FreePixmap ($bitmap);
-    }
   } else {
     shift->SUPER::diamond (@_);
   }
 }
 
+#------------------------------------------------------------------------------
 sub _make_bitmap_and_gc {
   my ($self, $width, $height) = @_;
   ### _make_bitmap_and_gc(): "$width,$height"
@@ -394,6 +365,31 @@ sub _make_bitmap_and_gc {
   $X->ChangeGC ($bitmap_gc, foreground => 1);
   return ($bitmap, $bitmap_gc);
 }
+
+#------------------------------------------------------------------------------
+
+# _rects_contain_xy($x,$y, [$rx,$ry,$rw,$rh],...) returns true if pixel
+# $x,$y is within any of the given rectangle arrayrefs.
+#
+# For any order except Unsorted could stop searching when $ry > $y, if that
+# was worth the extra code.
+#
+sub _rects_contain_xy {
+  ### _rects_contain_xy() ...
+  my $x = shift;
+  my $y = shift;
+  while (@_) {
+    my ($rx,$ry,$width,$height) = @{(shift)};
+    if ($rx <= $x && $rx+$width > $x
+        && $ry <= $y && $ry+$height > $y) {
+      ### found: "$x,$y  in  $rx,$ry, $width,$height"
+      return 1;
+    }
+  }
+  ### not found ...
+  return 0;
+}
+
 
 1;
 __END__
@@ -518,7 +514,7 @@ where the drawing operations should allocate colours.
 
 L<Image::Base>,
 L<Image::Base::X11::Protocol::Drawable>,
-L<Image::Base::X11::Protocol::Pixmap>,
+L<Image::Base::X11::Protocol::Pixmap>
 
 L<X11::Protocol>,
 L<X11::Protocol::Ext::SHAPE>
@@ -529,7 +525,7 @@ http://user42.tuxfamily.org/image-base-x11-protocol/index.html
 
 =head1 LICENSE
 
-Image-Base-X11-Protocol is Copyright 2010, 2011, 2012 Kevin Ryde
+Image-Base-X11-Protocol is Copyright 2010, 2011, 2012, 2013 Kevin Ryde
 
 Image-Base-X11-Protocol is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License as published by

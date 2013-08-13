@@ -1,4 +1,4 @@
-# Copyright 2010, 2011, 2012 Kevin Ryde
+# Copyright 2010, 2011, 2012, 2013 Kevin Ryde
 
 # This file is part of Image-Base-X11-Protocol.
 #
@@ -23,6 +23,7 @@ package Image::Base::X11::Protocol::Drawable;
 use 5.004;
 use strict;
 use Carp;
+use POSIX 'floor';
 use X11::Protocol 0.56; # version 0.56 for robust_req() fix
 use X11::Protocol::Other 3;  # v.3 for hexstr_to_rgb()
 use vars '@ISA', '$VERSION';
@@ -30,10 +31,10 @@ use vars '@ISA', '$VERSION';
 use Image::Base;
 @ISA = ('Image::Base');
 
-$VERSION = 13;
+$VERSION = 14;
 
 # uncomment this to run the ### lines
-#use Devel::Comments '###';
+# use Smart::Comments '###';
 
 sub new {
   my $class = shift;
@@ -199,7 +200,7 @@ sub xy {
   ### $y
   ### $colour
 
-  unless ($x >= 0 && $y >= 0 && $x <= 32767 && $y <= 32767) {
+  if ($x < 0 || $y < 0 || $x > 0x7FFF || $y > 0x7FFF) {
     ### outside max drawable, don't overflow INT16 ...
     return undef; # fetch or store
   }
@@ -208,8 +209,7 @@ sub xy {
   my $drawable = $self->{'-drawable'};
   if (@_ == 4) {
     # store colour
-    $X->PolyPoint ($drawable, _gc_colour($self,$colour),
-                   'Origin', $x,$y);
+    $X->PolyPoint ($drawable, _gc_colour($self,$colour), 'Origin', $x,$y);
     return;
   }
 
@@ -278,7 +278,7 @@ sub Image_Base_Other_xy_points {
     }
     my $x = shift;
     my $y = shift;
-    if ($x >= 0 && $y >= 0 && $x <= 32767 && $y <= 32767) {
+    if ($x >= 0 && $y >= 0 && $x <= 0x7FFF && $y <= 0x7FFF) {
       # within max drawable ...
       push @points, $x,$y;
     }
@@ -291,22 +291,8 @@ sub Image_Base_Other_xy_points {
 sub line {
   my ($self, $x1, $y1, $x2, $y2, $colour) = @_ ;
 
-  if (($x1 < 0 && $x2 < 0)
-      || ($y1 < 0 && $y2 < 0)
-      || ($x1 > 32767 && $x2 > 32767)
-      || ($y1 > 32767 && $y2 > 32767)) {
-    ### entirely outside max possible drawable ...
-    return;
-  }
-  if ($x1 < -32768 || $x2 < -32768
-      || $x1 > 32767 || $x2 > 32767
-      || $y1 < -32768 || $y2 < -32768
-      || $y1 > 32767 || $y2 > 32767) {
-    # ENHANCE-ME: line_clipper() to 2^15 boundaries might be close enough
-    ### coordinates would overflow, use superclass ...
-    shift->SUPER::line(@_);
-    return;
-  }
+  ($x1,$y1, $x2,$y2) = _line_clip ($x1,$y1, $x2,$y2)
+    or return;  # nothing left after clipping
 
   $self->{'-X'}->PolySegment ($self->{'-drawable'}, _gc_colour($self,$colour),
                               $x1,$y1, $x2,$y2);
@@ -316,20 +302,21 @@ sub rectangle {
   my ($self, $x1, $y1, $x2, $y2, $colour, $fill) = @_;
   ### X11-Protocol-Drawable rectangle
 
-  unless ($x2 >= 0 && $y2 >= 0 && $x1 <= 32767 && $y1 <= 32767) {
+  unless ($x2 >= 0 && $y2 >= 0 && $x1 <= 0x7FFF && $y1 <= 0x7FFF) {
     ### entirely outside max possible drawable ...
     return;
   }
 
-  # don't underflow INT16 -32768 x,y in request
-  # but retain negativeness so as not to bring unfilled sides into view
+  # Don't underflow INT16 -0x8000 x,y in request.  But retain negativeness so
+  # as not to bring top and left sides of an unfilled rect into view.
   if ($x1 < -1) { $x1 = -1; }
   if ($y1 < -1) { $y1 = -1; }
 
-  # don't overflow CARD16 width,height in request
-  # this doesn't bring the unfilled side into view
-  if ($x2 > 32767) { $x2 = 32767; }
-  if ($y2 > 32767) { $y2 = 32767; }
+  # Don't overflow CARD16 width,height in request.  Together with x1,y1 >=
+  # -1 this makes w,h <= 0x8002.  It doesn't bring the unfilled right and
+  # bottom sides into view even if the drawable is 0 to 0x7FFF.
+  if ($x2 > 0x8000) { $x2 = 0x8000; }
+  if ($y2 > 0x8000) { $y2 = 0x8000; }
 
   if ($x1 == $x2 || $y1 == $y2) {
     # single pixel wide or high, must treat as filled since PolyRectangle()
@@ -340,7 +327,7 @@ sub rectangle {
   }
   ### coords: [ $x1, $y1, $x2-$x1, $y2-$y1 ]
 
-  $self->{'-X'}->request (($fill ? 'PolyFillRectangle' : 'PolyRectangle'),
+  $self->{'-X'}->request ($fill ? 'PolyFillRectangle' : 'PolyRectangle',
                           $self->{'-drawable'},
                           _gc_colour($self,$colour),
                           [ $x1, $y1, $x2-$x1+$fill, $y2-$y1+$fill ]);
@@ -364,17 +351,17 @@ sub Image_Base_Other_rectangles {
   while (my ($x1,$y1, $x2,$y2) = splice @_,0,4) {
     ### quad: ($x1,$y1, $x2,$y2)
 
-    unless ($x2 >= 0 && $y2 >= 0 && $x1 <= 32767 && $y1 <= 32767) {
+    unless ($x2 >= 0 && $y2 >= 0 && $x1 <= 0x7FFF && $y1 <= 0x7FFF) {
       ### entirely outside max possible drawable ...
       next;
     }
-    # don't underflow INT16 -32768 x,y in request
+    # don't underflow INT16 -0x8000 x,y in request
     # but retain negativeness so as not to bring unfilled sides into view
     if ($x1 < -1) { $x1 = -1; }
     if ($y1 < -1) { $y1 = -1; }
     # don't overflow CARD16 width,height in request
-    if ($x2 > 32767) { $x2 = 32767; }
-    if ($y2 > 32767) { $y2 = 32767; }
+    if ($x2 > 0x8000) { $x2 = 0x8000; }
+    if ($y2 > 0x8000) { $y2 = 0x8000; }
 
     if (! $fill && ($x1 == $x2 || $y1 == $y2)) {
       # single pixel wide or high
@@ -457,12 +444,12 @@ sub ellipse {
     return;
   }
 
-  unless ($x2 >= 0 && $y2 >= 0 && $x1 <= 32767 && $y1 <= 32767) {
+  unless ($x2 >= 0 && $y2 >= 0 && $x1 <= 0x7FFF && $y1 <= 0x7FFF) {
     ### entirely outside max possible drawable ...
     return;
   }
 
-  if ($x1 < -32768 || $x2 > 32767 || $y1 < -32768 || $y2 > 32767) {
+  if ($x1 < -0x8000 || $x2 > 0x7FFF || $y1 < -0x8000 || $y2 > 0x7FFF) {
     ### coordinates would overflow, use superclass ...
     shift->SUPER::ellipse(@_);
     return;
@@ -488,58 +475,79 @@ sub diamond {
     return;
   }
 
-  unless ($x2 >= 0 && $y2 >= 0 && $x1 <= 32767 && $y1 <= 32767) {
-    ### entirely outside max possible drawable ...
-    return;
-  }
-  if ($x1 < -32768 || $y1 < -32768 || $x2 > 32767 || $y2 > 32767) {
-    ### coordinates would overflow, use superclass ...
-    shift->SUPER::ellipse(@_);
-    return;
-  }
-
-  my $X = $self->{'-X'};
-  my $drawable = $self->{'-drawable'};
-  my $gc = _gc_colour($self,$colour);
-
-  _diamond_drawable ($X, $drawable, $gc, $x1,$y1, $x2,$y2, $fill);
+  _diamond_drawable ($self->{'-X'},
+                     $self->{'-drawable'},
+                     _gc_colour($self,$colour),
+                     $x1,$y1, $x2,$y2, $fill);
 }
 
 # shared by Image::Base::X11::Protocol::Window::diamond()
 sub _diamond_drawable {
   my ($X, $drawable, $gc, $x1, $y1, $x2, $y2, $fill) = @_;
+  ### _diamond_drawable() ...
 
-  my $xh = ($x2 - $x1);
-  my $yh = ($y2 - $y1);
-  my $xeven = ($xh & 1);
-  my $yeven = ($yh & 1);
-  $xh = int($xh / 2);
-  $yh = int($yh / 2);
-  ### assert: $x1+$xh+$xeven == $x2-$xh
-  ### assert: $y1+$yh+$yeven == $y2-$yh
+  my $xh = int( ($x2 - $x1)/2 );
+  my $yh = int( ($y2 - $y1)/2 );
+  my $xmid_floor = $x1 + $xh;
+  my $xmid_ceil  = $x2 - $xh;
+  my $ymid_floor = $y1 + $yh;
+  my $ymid_ceil  = $y2 - $yh;
 
-  my @args =('Origin',
-
-             $x1+$xh, $y1,  # top centre
+  if ($fill) {
+    #                   1-0
+    #                  /
+    #                 2     7
+    #                 3     6
+    #                  \   /
+    #                   4-5
+    my @xy =(# top
+             ($xmid_floor == $xmid_ceil ? () : ($xmid_ceil, $y1)),
+             $xmid_floor, $y1,
 
              # left
-             $x1, $y1+$yh,
-             ($yeven ? ($x1, $y2-$yh) : ()),
+             $x1, $ymid_floor,
+             ($ymid_floor == $ymid_ceil ? () : ($x1, $ymid_ceil)),
 
              # bottom
-             $x1+$xh, $y2,
-             ($xeven ? ($x2-$xh, $y2) : ()),
+             $xmid_floor, $y2,
+             ($xmid_floor == $xmid_ceil ? () : ($xmid_ceil, $y2)),
 
              # right
-             ($yeven ? ($x2, $y2-$yh) : ()),
-             $x2, $y1+$yh,
+             ($ymid_floor == $ymid_ceil ? () : ($x2, $ymid_ceil)),
+             $x2, $ymid_floor,
+            );
+    _convex_poly_clip(\@xy);
+    ### clipped: @xy
+    if (@xy) {
+      push @xy, $xy[0],$xy[1];  # back to start
+      $X->FillPoly ($drawable, $gc, 'Convex', 'Origin', @xy);
+      $X->PolyLine ($drawable, $gc, 'Origin', @xy);
+    }
 
-             ($xeven ? ($x2-$xh, $y1) : ()),
-             $x1+$xh, $y1);  # back to start
-  if ($fill) {
-    $X->FillPoly ($drawable, $gc, 'Convex', @args);
+  } else {
+    # unfilled
+    $X->PolySegment ($drawable, $gc,
+
+                     # NW   A .
+                     #     /   \
+                     #    B     .
+                     _line_clip ($xmid_floor, $y1,  $x1, $ymid_floor),
+
+                     # SW B     .
+                     #     \   /
+                     #      A .
+                     _line_clip ($xmid_floor, $y2,  $x1, $ymid_ceil),
+
+                     # SE  .     B
+                     #      \   /
+                     #       . A
+                     _line_clip ($xmid_ceil, $y2,  $x2, $ymid_ceil),
+
+                     # NE    . A
+                     #      /   \
+                     #     .     B
+                     _line_clip ($xmid_ceil, $y1,  $x2, $ymid_floor));
   }
-  $X->PolyLine ($drawable, $gc, @args);
 }
 
 #------------------------------------------------------------------------------
@@ -554,7 +562,7 @@ sub pixel_to_colour {
   return $hash->{$pixel};
 }
 
-# return a gc XID set to draw in $colour
+# return a gc XID which is set to draw in $colour
 sub _gc_colour {
   my ($self, $colour) = @_;
   if ($colour eq 'None') {
@@ -573,8 +581,8 @@ sub _gc_colour {
         ### ChangeGC to pixel: $pixel
         $X->ChangeGC ($gc, foreground => $pixel);
       } else {
-        $gc = $self->{'-gc_created'} = $self->{'-X'}->new_rsrc;
-        ### CreateGC with pixel
+        $gc = $self->{'-gc_created'} = $X->new_rsrc;
+        ### CreateGC with pixel ...
         ### $gc
         ### $pixel
         $X->CreateGC ($gc, $self->{'-drawable'}, foreground => $pixel);
@@ -706,6 +714,290 @@ sub add_colours {
     die "Unknown colour(s): ",join(', ', @failed_colours);
   }
 }
+
+#------------------------------------------------------------------------------
+# clipping to signed 16-bit parameters
+
+use constant _LO => -0x8000;  # -32768
+use constant _HI =>  0x7FFF;  # +32767
+
+# $x1,$y1, $x2,$y2 are the endpoints of a line.
+# Return new endpoints which are clipped to within -0x8000 to +0x7FFF which is
+# signed 16-bits for X protocol.
+# If given line is entirely outside the signed 16-bit rectangle then return
+# an empty list.
+#
+sub _line_clip {
+  my ($x1,$y1, $x2,$y2) = @_;
+  ### _line_clip_16bit(): "$x1,$y1, $x2,$y2"
+
+  unless (_line_any_positive($x1,$y1, $x2,$y2)) {
+    ### nothing positive ...
+    return;
+  }
+
+  my ($x1new,$y1new) = _line_end_clip($x1,$y1, $x2,$y2)
+    or do {
+      ### x1,y1 end nothing in range ...
+      return;
+    };
+  ($x2,$y2) = _line_end_clip($x2,$y2, $x1,$y1)
+    or return;
+  return ($x1new,$y1new, $x2,$y2);
+}
+
+# $x1,$y1, $x2,$y2 are the endpoints of a line.
+# Return new values for the $x2,$y2 end which clips it to within
+#     LO <= x2 <= HI
+#     LO <= y2 <= HI
+#
+# If the line is entirely outside LO to HI then return an empty list.
+# If x2,y2 is already within LO to HI then return them unchanged.
+#
+#                     x1,y1
+#                    /
+#                +--------       if x2 outside
+#                | /             then
+#                |/              move it to x2new=LO
+#    x2new,y2new *               and y2new=corresponding pos on line
+#               /|
+#              / |
+#        x2,y2   +--------
+#               LO
+#
+#                +---------
+#                |               if y2 outside,
+#                |    x1,y1      including moved y2new outside
+#                |   /           then
+#                +--*-----       move it to y2new=LO
+#                  /x2new,       and x2new=corresponding pos on line
+#                 / y2new       
+#    first y2new *
+#               / 
+#              /  
+#        x2,y2              
+#
+sub _line_end_clip {
+  my ($x1,$y1, $x2,$y2) = @_;
+  ### _line_end_clip(): "$x1,$y1, $x2,$y2"
+
+  my ($x2new, $y2new);
+  if ($x2 < _LO || $x2 > _HI) {
+    # x2 is outside LO to HI, clip to x2=LOorHI and y2 set to corresponding
+    my $xlen = $x2 - $x1
+      or return;   # xlen==0 means x1==x2 so entirely outside LO to HI
+    $x2new = ($x2 < _LO ? _LO : _HI);
+    $y2new = floor(($y2*($x2new-$x1) + $y1*($x2-$x2new)) / $xlen + 0.5);
+
+    ### x clip: "to $x2new,$y2new   frac ".($y2*($x2new-$x1) + $y1*($x2-$x2new))." / $xlen"
+  } else {
+    $x2new = $x2;
+    $y2new = $y2;
+  }
+
+  if ($y2new < _LO || $y2new > _HI) {
+    my $ylen = $y2 - $y1
+      or return;   # ylen==0 means y1==y2 so entirely outside LO to HI
+    $y2new = ($y2 < _LO ? _LO : _HI);
+    $x2new = floor(($x2*($y2new-$y1) + $x1*($y2-$y2new)) / $ylen + 0.5);
+    ### y clip: "to $x2new,$y2new   left ".($y2new-$y1)." right ".($y2-$y2new)
+    if ($x2new < _LO || $x2new > _HI) {
+      ### x2new outside ...
+      return;
+    }
+  }
+
+  return ($x2new,$y2new);
+}
+
+#               x2,y2
+#              /
+#             /\
+#            /  \
+#           /    +---------
+#      x1,y1     |
+#                |
+#
+# perp X= -1-pos, Y=-1 -pos*(x2-x1)/(y2-y1)
+#      -pos = X+1
+#   Y = (X+1)*(x2-x1)/(y2-y1) - 1
+#
+# intersect
+#   (X+1)*(x2-x1)/(y2-y1) - 1 = (X-x1)/(x2-x1)*(y2-y1) + y1
+#   (X+1)*(x2-x1)/(y2-y1) = (X-x1)/(x2-x1)*(y2-y1) + (y1+1)
+#   (X+1)*(x2-x1) = (X-x1)/(x2-x1)*(y2-y1)*(y2-y1) + (y1+1)*(y2-y1)
+#   (X+1)*(x2-x1)*(x2-x1) = (X-x1)*(y2-y1)*(y2-y1) + (y1+1)*(y2-y1)*(x2-x1)
+#   X*(x2-x1)^2 + (x2-x1)^2 = X*(y2-y1)^2 - x1*(y2-y1)^2 + (y1+1)*(y2-y1)*(x2-x1)
+#   X*(x2-x1)^2 - X*(y2-y1)^2  = -(x2-x1)^2 - x1*(y2-y1)^2 + (y1+1)*(y2-y1)*(x2-x1)
+# 
+# line X=x1+pos, Y=y1 + pos*(y2-y1)/(x2-x1)
+#   Y=y1 + (X-x1)/(x2-x1)*(y2-y1)
+# eg. X=x1 Y=y1 + 0
+# eg. X=x2 Y=y1 + 1*(y2-y1) = y2
+#   Y-y1 = (X-x1)/(x2-x1)*(y2-y1)
+#   (Y-y1)*(x2-x1) = (X-x1)*(y2-y1)
+#
+# line at X=0 is 
+#   Y = (-x1)/(x2-x1)*(y2-y1) + y1
+# for Y <= -1
+#   (-x1)/(x2-x1)*(y2-y1) + y1 <= -1
+#   (-x1)/(x2-x1)*(y2-y1) <= -1-y1
+#   (-x1)*(y2-y1) <= (-1-y1)*(x2-x1)  would swap if x2<x1
+#   x1*(y2-y1) >= (y1+1)*(x2-x1)
+# eg. x1=-1;y1=-1; x2=1;y2=1  Y = 0  -2>=0
+#
+# eg. y1=y2=y 0 < (-1-y)*(x2-x1) 
+#   (x1+1)*(y2-y1) > (y1+1)*(x2-x1)
+# eg. x1=x2=5  -5*(y2-y1) > (y1+1)*0  no
+#
+#        | 5,-10
+#       /|
+# -----/----------
+# -10,5  |
+# eg. x1=-10;y1=5; x2=5;y2=-10; x1*(y2-y1); (y1+1)*(x2-x1)
+# is 150 < 90
+#
+#      |   10,-5
+# -------/-----
+#      |/
+#     /|
+# -5,10|
+# eg. x1=-5;y1=10; x2=10;y2=-5; x1*(y2-y1); (y1+1)*(x2-x1)
+# is 75 < 165
+#
+# eg. x1=5;y1=-10; x2=5;y2=10; x1*(y2-y1); (y1+1)*(x2-x1)
+# is 100 < 0
+#
+sub _line_any_positive {
+  my ($x1,$y1, $x2,$y2) = @_;
+
+  # swap ends to x1 <= x2
+  ($x1,$y1, $x2,$y2) = ($x2,$y2, $x1,$y1) if $x2 < $x1;
+  ### _line_any_positive() swapped to: "$x1, $y1,    $x2, $y2"
+
+  return (# must have x2 positive, otherwise all X negative
+          $x2 > -1
+          &&
+          (# if y2 positive then x2,y2 end both positive so line positive
+           $y2 > -1
+           ||
+           (# else must have y1 positive, otherwise y1 and y2 both negative
+            $y1 > -1
+            # now        |  x2,y2        |    x2,y2    x2 pos, y2 neg
+            #        ---------       ---------
+            #      x1,y1 |               | x1,y1       x1 pos or neg, y1 pos
+            # see if the X position corresponding to Y=0 is >= -1
+            &&
+            $x1*($y2-$y1) < ($y1+1)*($x2-$x1))));
+}
+
+# (xnew-xp)/(x-xp) = (ylo-yp)/(y-yp)
+# xnew-xp = (ylo-yp)/(y-yp)*(x-xp)
+# xnew = (ylo-yp)/(y-yp)*(x-xp) + xp
+#      = x*(ylo-yp)/(y-yp) - xp*(ylo-yp)/(y-yp) + xp
+#      = x*(ylo-yp)/(y-yp) + xp*(1 - (ylo-yp)/(y-yp))
+#      = x*(ylo-yp)/(y-yp) + xp*(((y-yp) - (ylo-yp))/(y-yp)
+#      = [ x*(ylo-yp) + xp*(y - yp - ylo + yp) ]/(y-yp)
+#      = [ x*(ylo-yp) + xp*(y-ylo) ]/(y-yp)
+#
+#                      x,y
+#                     /   \
+#                    /     \
+#                   /       \
+# xnew,ynew=ylo  ------------------  
+#                 /           \
+#                /             \
+#          xprev,yprev     xnext,ynext
+#
+#                      x,y
+#                     /   \
+#                    /   __* xnext,ynext
+#                   /__--
+# xnew,ynew=ylo  --*---------------  
+#                 /     
+#                /      
+#          xprev,yprev     
+#
+#  -8,-8               7,-7   
+#    *----          ----*
+#    |    |        |    |  
+#     ----*        *----  
+#         7,7    -8,8    
+#
+
+# _convex_poly_clip() takes $aref is an arrayref of vertex coordinates
+# $aref = [ $x1,$y1, $x2,$y2, ..., $xn,$yn ].
+#
+# The polygon is line segment $x1,$y1 to $x2,$y2, etc, and final
+# $xn,$yn back to $x1,$y1 start.
+#
+# Modify the array contents to clip the polygon to signed 16-bit.
+# This might either increase or decrease the total number of vertices.
+# If the polygon is entirely outside 16-bits then leave an empty array.
+#
+sub _convex_poly_clip {
+  my ($aref) = @_;
+  ### _convex_poly_clip(): $aref
+
+  foreach (1 .. 4) {  # each side
+    ### side: $_
+
+    for (my $i = 0; $i < $#$aref && $#$aref >= 3; ) {
+      ### at: "i=$i of ".scalar(@$aref)."  ".join(', ',@$aref)
+      my $y = $aref->[$i+1];
+      if ($y <= _HI) {
+        # This vertex is below the _HI limit, keep it unchanged.
+        $i += 2;
+
+      } else {
+        # This vertex is outside the _HI limit, replace it by zero, one or
+        # two new clipped points.
+        my ($x,$y) = splice @$aref, $i,2;
+
+        {
+          my $yprev = $aref->[$i-1];  # with possible wrap back to $xn,$yn
+          if ($yprev <= _HI) {
+            my $xprev = $aref->[$i-2];
+            my $xnew = int(($x*(_HI - $yprev) + $xprev*($y - _HI)) / ($y-$yprev)
+                           + 0.5);
+            splice @$aref, $i,0, $xnew,_HI;
+            $i += 2;
+          } else {
+            # $yprev and $y both above _HI limit, so nothing for segment
+            # $yprev to $y, just leave $yprev for the next vertex to
+            # consider.  (This case only occurs when $i==0 and so $yprev is
+            # wrapped back to the last vertex $yn.  Any later $i will have
+            # $yprev already clipped to $yprev<=_HI.)
+          }
+        }
+
+        {
+          my $inext = $i % scalar(@$aref);
+          my $ynext = $aref->[$inext+1];
+          if ($ynext <= _HI) {
+            my $xnext = $aref->[$inext];
+            my $xnew = int(($x*(_HI - $ynext) + $xnext*($y - _HI)) / ($y-$ynext)
+                           + 0.5);
+            splice @$aref, $i,0, $xnew,_HI;
+            $i += 2;
+          } else {
+            # $y and $ynext both above _HI limit, so nothing for segment $y
+            # to $ynext
+          }
+        }
+      }
+    }
+
+    # rotate 90
+    for (my $i = 0; $i < $#$aref; $i += 2) {
+      ($aref->[$i],$aref->[$i+1]) = ($aref->[$i+1], -1 - $aref->[$i]);
+    }
+  }
+  if (@$aref == 2) {
+    @$aref = ();
+  }
+}
+
 
 1;
 __END__
@@ -872,7 +1164,7 @@ attributes (that's left to an application if/when required).
 =item C<-height> (integer, read-only)
 
 Width and height are read-only.  The minimum is 1 pixel, the maximum in the
-protocol is 32767 (a signed 16-bit value).
+protocol is 0x7FFF (a signed 16-bit value).
 
 Fetching with C<get()> queries the server with C<GetGeometry> and then
 caches.  If you already know the size then including values in the C<new()>
@@ -967,7 +1259,7 @@ http://user42.tuxfamily.org/image-base-x11-protocol/index.html
 
 =head1 LICENSE
 
-Image-Base-X11-Protocol is Copyright 2010, 2011, 2012 Kevin Ryde
+Image-Base-X11-Protocol is Copyright 2010, 2011, 2012, 2013 Kevin Ryde
 
 Image-Base-X11-Protocol is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License as published by
